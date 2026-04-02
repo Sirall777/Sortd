@@ -888,13 +888,37 @@ async function fetchPlaylist() {
       log(`Artist genres: ${Math.min(i+50, artistIds.length)}/${artistIds.length}`, 'current');
     }
 
-    // Attach genres and categorize
+    // Attach genres and first-pass categorize
     log('Categorizing songs...', 'current');
     allSongs.forEach(s => {
       s.genres = artistGenres[s.artistId] || [];
       s.bucket = categorizeSong(s);
     });
 
+    // Second pass: fetch audio features for misc songs
+    const miscSongs = allSongs.filter(s => s.bucket === 'misc');
+    log(`${miscSongs.length} uncategorized — running audio features pass...`, 'current');
+
+    const miscIds = miscSongs.map(s => s.id);
+    const audioFeatures = {};
+    for (let i = 0; i < miscIds.length; i += 100) {
+      const batch = miscIds.slice(i, i + 100);
+      try {
+        const data = await spotifyGet('/audio-features', { ids: batch.join(',') });
+        (data.audio_features || []).forEach(f => { if (f) audioFeatures[f.id] = f; });
+      } catch(e) {}
+      log(`Audio features: ${Math.min(i+100, miscIds.length)}/${miscIds.length}`, 'current');
+    }
+
+    // Re-categorize misc songs using audio features + title/artist heuristics
+    miscSongs.forEach(s => {
+      const af = audioFeatures[s.id];
+      const result = categorizeByAudioFeatures(s, af);
+      if (result !== 'misc') s.bucket = result;
+    });
+
+    const stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
+    log(`Audio features pass complete — ${miscSongs.length - stillMisc} songs rescued from Misc`, 'done');
     log('Categorization complete!', 'done');
     log('Building review interface...', 'current');
 
@@ -908,6 +932,64 @@ async function fetchPlaylist() {
     log('Error: ' + e.message, 'error');
     showToast(e.message, 'error');
   }
+}
+
+// ─── AUDIO FEATURES CATEGORIZATION ───────────────────────────────────────────
+function categorizeByAudioFeatures(song, af) {
+  const title = song.title.toLowerCase();
+  const artist = song.artist.toLowerCase();
+
+  // ── Script/character detection (most reliable signal) ──
+  // Japanese characters (hiragana, katakana, kanji)
+  if (/[぀-ヿ㐀-䶿一-鿿]/.test(song.artist + song.title)) return 'jmusic';
+  // Korean hangul
+  if (/[가-힯ᄀ-ᇿ]/.test(song.artist + song.title)) return 'kpop';
+
+  // ── Artist name heuristics ──
+  if (/wizkid|burna boy|davido|tems|ckay|rema|omah lay|fireboy|asake|kizz daniel|afrobeats|yemi alade|tiwa savage|mr eazi|olamide|naira marley|zlatan|patoranking|tekno|adekunle gold/.test(artist)) return 'afro';
+  if (/drake|kendrick|travis scott|j\.? cole|future|lil |young |nba |playboi|uzi|21 savage|gunna|offset|metro boomin|roddy ricch|polo g|juice wrld|xxxtentacion|a\$ap|asap|wiz khalifa|snoop|eminem|tyler the creator|childish gambino|chance the rapper|mac miller|logic|big sean|meek mill|joey badass|flatbush|denzel curry|earthgang|dreamville/.test(artist)) return 'rap';
+  if (/beyonce|sza|frank ocean|the weeknd|daniel caesar|jorja smith|h\.e\.r\.|ella mai|summer walker|mahalia|brent faiyaz|giveon|lucky daye|jazmine sullivan|ari lennox|kehlani|tinashe|jhene aiko|doja cat|normani/.test(artist)) return 'rnb';
+  if (/taylor swift|ariana grande|billie eilish|olivia rodrigo|dua lipa|selena gomez|carly rae|katy perry|lady gaga|charlie xcx|charli xcx|sabrina carpenter|gracie abrams|beabadoobee|conan gray|lorde|lana del rey|halsey|melanie martinez/.test(artist)) return 'pop';
+  if (/bring me the horizon|bmth|paramore|my chemical romance|mcr|sleeping with sirens|pierce the veil|falling in reverse|a day to remember|adtr|the used|hawthorne heights|taking back sunday|panic at the disco|fall out boy|twenty one pilots|all time low|simple plan|sum 41|blink.?182|green day|linkin park|system of a down|tool|slipknot|avenged sevenfold|breaking benjamin|three days grace|nickelback|foo fighters|red hot chili peppers|rhcp|imagine dragons/.test(artist)) return 'rock';
+  if (/calvin harris|martin garrix|tiesto|deadmau5|skrillex|diplo|zedd|marshmello|chainsmokers|illenium|kygo|odesza|porter robinson|madeon|disclosure|flume|rezz|subtronics|excision|getter|slander|san holo/.test(artist)) return 'edm';
+  if (/john williams|hans zimmer|howard shore|ennio morricone|danny elfman|joe hisaishi|yoko shimomura|nobuo uematsu|koji kondo|yasunori mitsuda|bear mccreary|ramin djawadi|alexandre desplat/.test(artist)) return 'game';
+
+  // ── Title heuristics ──
+  if (/opening|ending|ost|theme song|main theme|insert song|bgm|soundtrack/.test(title)) return 'game';
+
+  // ── Audio features fallback (when af data exists) ──
+  if (!af) return 'misc';
+
+  const { energy, danceability, acousticness, valence, tempo, speechiness, instrumentalness } = af;
+
+  // Instrumental + low speech = likely OST
+  if (instrumentalness > 0.7 && speechiness < 0.1) return 'game';
+
+  // High speech = rap
+  if (speechiness > 0.2 && energy > 0.4) return 'rap';
+
+  // High energy + high danceability = EDM
+  if (energy > 0.8 && danceability > 0.7 && acousticness < 0.15) return 'edm';
+
+  // High energy + low danceability = rock
+  if (energy > 0.75 && danceability < 0.55 && acousticness < 0.2) return 'rock';
+
+  // Very acoustic + low energy = ballad
+  if (acousticness > 0.7 && energy < 0.4) return 'ballad';
+
+  // Moderate energy + high danceability + mid tempo = R&B/Afro zone
+  if (danceability > 0.65 && energy > 0.45 && energy < 0.78 && tempo > 85 && tempo < 130) {
+    // Slightly higher danceability leans afro, lower leans rnb
+    return danceability > 0.75 ? 'afro' : 'rnb';
+  }
+
+  // Mid energy + decent danceability = pop
+  if (energy > 0.4 && energy < 0.8 && danceability > 0.55 && acousticness < 0.5) return 'pop';
+
+  // Low energy + mid acousticness = ballad
+  if (energy < 0.35 && acousticness > 0.3) return 'ballad';
+
+  return 'misc';
 }
 
 // ─── CATEGORIZATION ────────────────────────────────────────────────────────
