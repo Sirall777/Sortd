@@ -1307,8 +1307,7 @@ async function emergencyClaudePass() {
 
   for (let i = 0; i < miscSongs.length; i += BATCH) {
     const batch = miscSongs.slice(i, i + BATCH);
-    const songList = batch.map((s, idx) => `${idx + 1}. "${s.title}" by ${s.artist} (${s.year})`).join('
-');
+    const songList = batch.map((s, idx) => (idx + 1) + '. "' + s.title + '" by ' + s.artist + ' (' + s.year + ')').join('\n');
 
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1332,8 +1331,7 @@ async function emergencyClaudePass() {
 
 Respond ONLY with a JSON array of bucket IDs in the same order as the songs. Example: ["pop","rap","rock"]
 No explanation, no markdown, just the raw JSON array.`,
-          messages: [{ role: 'user', content: `Categorize these songs:
-${songList}` }]
+          messages: [{ role: 'user', content: 'Categorize these songs:\n' + songList }]
         })
       });
 
