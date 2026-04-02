@@ -1187,55 +1187,27 @@ async function fetchPlaylist() {
     let stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
     log(`Audio features pass — ${miscSongs.length - stillMisc} rescued, ${stillMisc} remaining`, 'done');
 
-    // ── PASS 3: MusicBrainz (concurrent batches of 3) ──
-    miscSongs = allSongs.filter(s => s.bucket === 'misc');
-    const uniqueMbArtists = [...new Set(miscSongs.map(s => s.artist.toLowerCase()))];
-    log(`Running MusicBrainz pass — ${uniqueMbArtists.length} unique artists...`, 'current');
-
-    const mbArtistCache = {};
-    const MB_BATCH = 3; // MusicBrainz allows ~1 req/sec per IP, 3 concurrent is safe
-    for (let i = 0; i < uniqueMbArtists.length; i += MB_BATCH) {
-      const batch = uniqueMbArtists.slice(i, i + MB_BATCH);
-      await Promise.all(batch.map(async artistKey => {
-        const originalArtist = miscSongs.find(s => s.artist.toLowerCase() === artistKey)?.artist || artistKey;
-        const tags = await fetchMusicBrainzTags(originalArtist);
-        mbArtistCache[artistKey] = tags;
-      }));
-      if (i % 30 === 0) log(`MusicBrainz: ${Math.min(i + MB_BATCH, uniqueMbArtists.length)}/${uniqueMbArtists.length} artists...`, 'current');
-      await sleep(1200); // wait between batches to respect rate limit
-    }
-
-    let mbRescued = 0;
-    miscSongs.forEach(s => {
-      const tags = mbArtistCache[s.artist.toLowerCase()] || [];
-      if (tags.length > 0) {
-        const bucket = categorizeByTags(tags);
-        if (bucket !== 'misc') { s.bucket = bucket; mbRescued++; }
-      }
-    });
-
-    stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
-    log(`MusicBrainz pass — ${mbRescued} rescued, ${stillMisc} remaining`, 'done');
-
-    // ── PASS 4: Last.fm ──
+    // ── PASS 3: Last.fm (parallel, artist-deduplicated) ──
     miscSongs = allSongs.filter(s => s.bucket === 'misc');
     if (LASTFM_KEY && miscSongs.length > 0) {
-      // Deduplicate by artist first, then apply to all songs
-      const uniqueLfmArtists = [...new Set(miscSongs.map(s => s.artist.toLowerCase()))];
-      log(`Running Last.fm pass — ${uniqueLfmArtists.length} unique artists (${miscSongs.length} songs)...`, 'current');
+      // Build artist→representative song map (one lookup per unique artist)
+      const artistSongMap = {};
+      miscSongs.forEach(s => {
+        const key = s.artist.toLowerCase();
+        if (!artistSongMap[key]) artistSongMap[key] = s;
+      });
+      const uniqueEntries = Object.entries(artistSongMap);
+      log(`Last.fm pass — ${uniqueEntries.length} unique artists (${miscSongs.length} songs)...`, 'current');
 
       const lfmCache = {};
-      const LFM_BATCH = 8; // Last.fm is generous — 8 concurrent is fine
-      for (let i = 0; i < uniqueLfmArtists.length; i += LFM_BATCH) {
-        const batch = uniqueLfmArtists.slice(i, i + LFM_BATCH);
-        await Promise.all(batch.map(async artistKey => {
-          const s = miscSongs.find(s => s.artist.toLowerCase() === artistKey);
-          if (!s) return;
-          const tags = await fetchLastFmTags(s.artist, s.title);
-          lfmCache[artistKey] = tags;
+      const LFM_BATCH = 15; // Last.fm handles concurrent fine
+      for (let i = 0; i < uniqueEntries.length; i += LFM_BATCH) {
+        const batch = uniqueEntries.slice(i, i + LFM_BATCH);
+        await Promise.all(batch.map(async ([artistKey, s]) => {
+          lfmCache[artistKey] = await fetchLastFmTags(s.artist, s.title);
         }));
-        if (i % 40 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueLfmArtists.length)}/${uniqueLfmArtists.length} artists...`, 'current');
-        await sleep(250); // small pause between batches
+        if (i % 60 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueEntries.length)}/${uniqueEntries.length} artists...`, 'current');
+        await sleep(100); // minimal pause — just avoid hammering
       }
 
       let lfmRescued = 0;
@@ -1250,7 +1222,7 @@ async function fetchPlaylist() {
       stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
       log(`Last.fm pass — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
     } else if (!LASTFM_KEY) {
-      log('No Last.fm key — skipping Last.fm pass', '');
+      log('No Last.fm key — skipping (add key on login screen)', '');
     }
 
     const totalMisc = allSongs.filter(s => s.bucket === 'misc').length;
@@ -1273,51 +1245,54 @@ async function fetchPlaylist() {
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function fetchMusicBrainzTags(artistName) {
-  try {
-    const res = await fetch(`https://musicbrainz.org/ws/2/artist/?query=artist:"${encodeURIComponent(artistName)}"&fmt=json&limit=1`, {
-      headers: { 'User-Agent': 'SORTD/1.0 (playlist-sorter)' }
-    });
-    const data = await res.json();
-    const artist = data.artists?.[0];
-    if (!artist) return [];
-    const tags = (artist.tags || []).map(t => t.name.toLowerCase());
-    const genres = (artist.genres || []).map(g => g.name.toLowerCase());
-    return [...new Set([...tags, ...genres])];
-  } catch(e) { return []; }
-}
-
 async function fetchLastFmTags(artistName, trackName) {
   if (!LASTFM_KEY) return [];
   try {
-    // Try track tags first, fall back to artist tags
-    const trackRes = await fetch(`https://ws.audioscrobbler.com/2.0/?method=track.gettoptags&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}&api_key=${LASTFM_KEY}&format=json`);
-    const trackData = await trackRes.json();
+    // Fetch artist tags + track tags in parallel — combine both for best coverage
+    const [artistRes, trackRes] = await Promise.all([
+      fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`),
+      fetch(`https://ws.audioscrobbler.com/2.0/?method=track.gettoptags&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`)
+    ]);
+    const [artistData, trackData] = await Promise.all([artistRes.json(), trackRes.json()]);
+    const artistTags = (artistData.toptags?.tag || []).map(t => t.name.toLowerCase());
     const trackTags = (trackData.toptags?.tag || []).map(t => t.name.toLowerCase());
-    if (trackTags.length > 2) return trackTags;
-
-    // Fall back to artist tags
-    const artistRes = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}&api_key=${LASTFM_KEY}&format=json`);
-    const artistData = await artistRes.json();
-    return (artistData.toptags?.tag || []).map(t => t.name.toLowerCase());
+    // Combine and deduplicate, artist tags first (more reliable)
+    return [...new Set([...artistTags, ...trackTags])];
   } catch(e) { return []; }
 }
 
 function categorizeByTags(tags) {
-  const t = tags.join(' ');
-  // Order matters — most specific first
-  if (/afrobeats|afropop|afroswing|amapiano|afrobeat|highlife|afro pop|afro house/.test(t)) return 'afro';
-  if (/k-pop|kpop|korean pop|k pop/.test(t)) return 'kpop';
-  if (/j-pop|jpop|j-rock|jrock|vocaloid|anime|japanese pop|japanese rock/.test(t)) return 'jmusic';
-  if (/video game|game music|chiptune|game ost|video game music/.test(t)) return 'game';
-  if (/film score|movie soundtrack|musical theatre|broadway|television music|cinematic/.test(t)) return 'game';
-  if (/hip.?hop|rap|trap|drill|grime|boom bap/.test(t)) return 'rap';
-  if (/r&b|rnb|neo soul|soul|urban contemporary|rhythm and blues/.test(t)) return 'rnb';
-  if (/metal|punk|screamo|hardcore|post-hardcore|metalcore|emo|grunge/.test(t)) return 'rock';
-  if (/rock(?! steady)|alternative rock|indie rock|classic rock|hard rock|pop rock/.test(t)) return 'rock';
-  if (/edm|electronic dance|house|techno|trance|dubstep|drum and bass|synthwave|hyperpop|future bass/.test(t)) return 'edm';
-  if (/ballad|singer.songwriter|acoustic|easy listening|adult contemporary|soft rock/.test(t)) return 'ballad';
-  if (/pop/.test(t)) return 'pop';
+  const t = ' ' + tags.join(' ') + ' ';
+
+  // Most specific first — cultural/regional genres override generic ones
+  if (/afrobeats|afropop|afroswing|amapiano|afrobeat|highlife|afro pop|afro house|naija|nigerian pop|afrofusion/.test(t)) return 'afro';
+  if (/k.pop|kpop|korean pop|korean r.b|korean hip hop|k.indie|k.rap/.test(t)) return 'kpop';
+  if (/j.pop|jpop|j.rock|jrock|vocaloid|anime|japanese pop|japanese rock|city pop|shibuya|visual kei/.test(t)) return 'jmusic';
+
+  // OST / instrumental
+  if (/video game|game music|chiptune|game ost|video game music|nintendo|playstation/.test(t)) return 'game';
+  if (/film score|movie soundtrack|musical theatre|broadway|television music|cinematic|orchestral/.test(t)) return 'game';
+  if (/ ost |original soundtrack|anime ost/.test(t)) return 'game';
+
+  // Rap — check before r&b since trap overlaps
+  if (/hip.?hop|rap|trap|drill|grime|boom bap|mumble rap|gangsta|melodic rap/.test(t)) return 'rap';
+
+  // R&B and soul
+  if (/r&b|rnb|neo soul|soul|urban contemporary|rhythm and blues|new jack swing|motown|quiet storm/.test(t)) return 'rnb';
+
+  // Rock — metal/punk first, then broader rock
+  if (/metal|punk|screamo|hardcore|post-hardcore|metalcore|emo|grunge|death metal|black metal|thrash/.test(t)) return 'rock';
+  if (/rock|alternative rock|indie rock|classic rock|hard rock|pop punk|garage rock|psychedelic rock/.test(t)) return 'rock';
+
+  // EDM / electronic
+  if (/edm|electronic dance|house|techno|trance|dubstep|drum and bass|dnb|synthwave|hyperpop|future bass|lo.fi|ambient electronic|club music/.test(t)) return 'edm';
+
+  // Ballad / soft
+  if (/ballad|singer.songwriter|acoustic|easy listening|adult contemporary|soft rock|folk|country/.test(t)) return 'ballad';
+
+  // Pop last — broad catch
+  if (/pop|dance pop|indie pop|synth.pop|electropop|teen pop|art pop/.test(t)) return 'pop';
+
   return 'misc';
 }
 
