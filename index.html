@@ -1187,25 +1187,24 @@ async function fetchPlaylist() {
     let stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
     log(`Audio features pass — ${miscSongs.length - stillMisc} rescued, ${stillMisc} remaining`, 'done');
 
-    // ── PASS 3: MusicBrainz ──
+    // ── PASS 3: MusicBrainz (concurrent batches of 3) ──
     miscSongs = allSongs.filter(s => s.bucket === 'misc');
-
-    // Deduplicate artists — only fetch each unique artist once
     const uniqueMbArtists = [...new Set(miscSongs.map(s => s.artist.toLowerCase()))];
-    log(`Running MusicBrainz pass — ${uniqueMbArtists.length} unique artists (${miscSongs.length} songs)...`, 'current');
+    log(`Running MusicBrainz pass — ${uniqueMbArtists.length} unique artists...`, 'current');
 
     const mbArtistCache = {};
-    for (let i = 0; i < uniqueMbArtists.length; i++) {
-      const artistKey = uniqueMbArtists[i];
-      // Find original casing for the API call
-      const originalArtist = miscSongs.find(s => s.artist.toLowerCase() === artistKey)?.artist || artistKey;
-      const tags = await fetchMusicBrainzTags(originalArtist);
-      mbArtistCache[artistKey] = tags;
-      if (i % 10 === 0) log(`MusicBrainz: ${i}/${uniqueMbArtists.length} artists...`, 'current');
-      await sleep(1100); // MusicBrainz allows 1 req/sec — stay just under
+    const MB_BATCH = 3; // MusicBrainz allows ~1 req/sec per IP, 3 concurrent is safe
+    for (let i = 0; i < uniqueMbArtists.length; i += MB_BATCH) {
+      const batch = uniqueMbArtists.slice(i, i + MB_BATCH);
+      await Promise.all(batch.map(async artistKey => {
+        const originalArtist = miscSongs.find(s => s.artist.toLowerCase() === artistKey)?.artist || artistKey;
+        const tags = await fetchMusicBrainzTags(originalArtist);
+        mbArtistCache[artistKey] = tags;
+      }));
+      if (i % 30 === 0) log(`MusicBrainz: ${Math.min(i + MB_BATCH, uniqueMbArtists.length)}/${uniqueMbArtists.length} artists...`, 'current');
+      await sleep(1200); // wait between batches to respect rate limit
     }
 
-    // Apply cached tags to all misc songs
     let mbRescued = 0;
     miscSongs.forEach(s => {
       const tags = mbArtistCache[s.artist.toLowerCase()] || [];
@@ -1221,24 +1220,33 @@ async function fetchPlaylist() {
     // ── PASS 4: Last.fm ──
     miscSongs = allSongs.filter(s => s.bucket === 'misc');
     if (LASTFM_KEY && miscSongs.length > 0) {
-      log(`Running Last.fm pass on ${miscSongs.length} songs...`, 'current');
+      // Deduplicate by artist first, then apply to all songs
+      const uniqueLfmArtists = [...new Set(miscSongs.map(s => s.artist.toLowerCase()))];
+      log(`Running Last.fm pass — ${uniqueLfmArtists.length} unique artists (${miscSongs.length} songs)...`, 'current');
+
       const lfmCache = {};
+      const LFM_BATCH = 8; // Last.fm is generous — 8 concurrent is fine
+      for (let i = 0; i < uniqueLfmArtists.length; i += LFM_BATCH) {
+        const batch = uniqueLfmArtists.slice(i, i + LFM_BATCH);
+        await Promise.all(batch.map(async artistKey => {
+          const s = miscSongs.find(s => s.artist.toLowerCase() === artistKey);
+          if (!s) return;
+          const tags = await fetchLastFmTags(s.artist, s.title);
+          lfmCache[artistKey] = tags;
+        }));
+        if (i % 40 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueLfmArtists.length)}/${uniqueLfmArtists.length} artists...`, 'current');
+        await sleep(250); // small pause between batches
+      }
+
       let lfmRescued = 0;
-      for (let i = 0; i < miscSongs.length; i++) {
-        const s = miscSongs[i];
-        const cacheKey = s.artist.toLowerCase();
-        let tags = lfmCache[cacheKey];
-        if (!tags) {
-          tags = await fetchLastFmTags(s.artist, s.title);
-          lfmCache[cacheKey] = tags;
-        }
+      miscSongs.forEach(s => {
+        const tags = lfmCache[s.artist.toLowerCase()] || [];
         if (tags.length > 0) {
           const bucket = categorizeByTags(tags);
           if (bucket !== 'misc') { s.bucket = bucket; lfmRescued++; }
         }
-        if (i % 20 === 0) log(`Last.fm: ${i}/${miscSongs.length}...`, 'current');
-        await sleep(120); // rate limit
-      }
+      });
+
       stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
       log(`Last.fm pass — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
     } else if (!LASTFM_KEY) {
