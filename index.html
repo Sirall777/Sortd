@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORTD v2.3.1 — Playlist Sorter</title>
+<title>SORTD v2.4 — Playlist Sorter</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1191,21 +1191,51 @@ async function fetchPlaylist() {
     let stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
     log(`Audio features pass — ${miscSongs.length - stillMisc} rescued, ${stillMisc} remaining`, 'done');
 
-    // ── PASS 3: Last.fm rescue for remaining Misc ──
+    // ── PASS 3: Last.fm ──
     miscSongs = allSongs.filter(s => s.bucket === 'misc');
-    if (miscSongs.length > 0) {
-      log(`Last.fm rescue pass on ${miscSongs.length} remaining songs...`, 'current');
+    if (LASTFM_KEY && miscSongs.length > 0) {
+      // Deduplicate — one fetch per unique artist
+      const artistSongMap = {};
+      miscSongs.forEach(s => {
+        s.artist.split(',').forEach(a => {
+          const key = a.trim().toLowerCase();
+          if (!artistSongMap[key]) artistSongMap[key] = { artist: a.trim(), title: s.title };
+        });
+      });
+      const uniqueEntries = Object.entries(artistSongMap);
+      log(`Last.fm pass — ${uniqueEntries.length} unique artists (${miscSongs.length} songs)...`, 'current');
+
+      const lfmCache = {};
+      const LFM_BATCH = 5;
+      for (let i = 0; i < uniqueEntries.length; i += LFM_BATCH) {
+        const batch = uniqueEntries.slice(i, i + LFM_BATCH);
+        await Promise.all(batch.map(async ([artistKey, s]) => {
+          const tags = await fetchLastFmTags(s.artist, s.title);
+          lfmCache[artistKey] = tags;
+          if (artistKey.includes('khaled')) {
+            log('DEBUG "' + artistKey + '" → ' + tags.slice(0,5).join(', '), 'current');
+          }
+        }));
+        if (i % 50 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueEntries.length)}/${uniqueEntries.length} artists...`, 'current');
+        await sleep(150);
+      }
+
       let lfmRescued = 0;
       miscSongs.forEach(s => {
-        // Use cached tags from pre-pass — try all artists on track
-        const tags = s.artist.split(',').flatMap(a => globalLfmCache[a.trim().toLowerCase()] || []);
-        if (tags.length > 0) {
-          const bucket = categorizeByTags(tags);
+        // Combine tags from ALL artists on the track
+        const allTags = [...new Set(
+          s.artist.split(',').flatMap(a => lfmCache[a.trim().toLowerCase()] || [])
+        )];
+        if (allTags.length > 0) {
+          const bucket = categorizeByTags(allTags);
           if (bucket !== 'misc') { s.bucket = bucket; lfmRescued++; }
         }
       });
+
       stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
-      log(`Last.fm rescue — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
+      log(`Last.fm pass — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
+    } else if (!LASTFM_KEY) {
+      log('No Last.fm key — skipping', '');
     }
 
     const totalMisc = allSongs.filter(s => s.bucket === 'misc').length;
