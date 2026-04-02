@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORTD v1.4 — Playlist Sorter</title>
+<title>SORTD v1.8 — Playlist Sorter</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1197,17 +1197,24 @@ async function fetchPlaylist() {
         if (!artistSongMap[key]) artistSongMap[key] = s;
       });
       const uniqueEntries = Object.entries(artistSongMap);
+      // Quick test fetch to verify Last.fm is responding
+      try {
+        const testRes = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=Elton+John&api_key=${LASTFM_KEY}&format=json`);
+        const testData = await testRes.json();
+        const testTags = testData.toptags?.tag?.length || 0;
+        log(`Last.fm API check: ${testTags} tags for Elton John (${testTags > 0 ? 'working' : 'NOT WORKING'})`, testTags > 0 ? 'done' : 'error');
+      } catch(e) { log('Last.fm API check failed: ' + e.message, 'error'); }
       log(`Last.fm pass — ${uniqueEntries.length} unique artists (${miscSongs.length} songs)...`, 'current');
 
       const lfmCache = {};
-      const LFM_BATCH = 15; // Last.fm handles concurrent fine
+      const LFM_BATCH = 5; // conservative to avoid silent drops
       for (let i = 0; i < uniqueEntries.length; i += LFM_BATCH) {
         const batch = uniqueEntries.slice(i, i + LFM_BATCH);
         await Promise.all(batch.map(async ([artistKey, s]) => {
           lfmCache[artistKey] = await fetchLastFmTags(s.artist, s.title);
         }));
         if (i % 60 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueEntries.length)}/${uniqueEntries.length} artists...`, 'current');
-        await sleep(100); // minimal pause — just avoid hammering
+        await sleep(200);
       }
 
       let lfmRescued = 0;
@@ -1248,16 +1255,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function fetchLastFmTags(artistName, trackName) {
   if (!LASTFM_KEY) return [];
   try {
-    // Fetch artist tags + track tags in parallel — combine both for best coverage
-    const [artistRes, trackRes] = await Promise.all([
-      fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`),
-      fetch(`https://ws.audioscrobbler.com/2.0/?method=track.gettoptags&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`)
-    ]);
-    const [artistData, trackData] = await Promise.all([artistRes.json(), trackRes.json()]);
-    const artistTags = (artistData.toptags?.tag || []).map(t => t.name.toLowerCase());
-    const trackTags = (trackData.toptags?.tag || []).map(t => t.name.toLowerCase());
-    // Combine and deduplicate, artist tags first (more reliable)
-    return [...new Set([...artistTags, ...trackTags])];
+    const url = `https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.error) return [];
+    return (data.toptags?.tag || []).map(t => t.name.toLowerCase());
   } catch(e) { return []; }
 }
 
