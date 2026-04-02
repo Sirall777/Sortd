@@ -713,7 +713,7 @@
       <!-- SUCCESS -->
       <div id="success-view" class="success-screen">
         <div class="success-title">DONE.</div>
-        <div class="success-sub">8 playlists created on your Spotify account.</div>
+        <div class="success-sub">11 playlists created on your Spotify account.</div>
         <div class="created-list" id="created-list"></div>
         <button class="btn-create" onclick="location.reload()">Start Over</button>
       </div>
@@ -724,7 +724,7 @@
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
-const REDIRECT_URI = window.location.href.split('?')[0].split('#')[0];
+const REDIRECT_URI = 'https://sirall777.github.io/Sortd';
 const SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
@@ -734,14 +734,17 @@ const SCOPES = [
 ].join(' ');
 
 const BUCKETS = [
-  { id: 'rock',    name: 'Rock / Screamo',   color: '#ff6b35', genres: ['rock','punk','metal','screamo','emo','alternative','hardcore','grunge','pop punk','indie rock','post-hardcore','metalcore','post-rock'] },
-  { id: 'jmusic',  name: 'J-Music',          color: '#ff3cac', genres: ['j-pop','j-rock','j-indie','anime','vocaloid','japanese','city pop','shibuya-kei','visual kei','j-metal','j-dance','jpop','jrock'] },
-  { id: 'kpop',    name: 'K-Pop / Korean',   color: '#00d4ff', genres: ['k-pop','korean','k-indie','k-r&b','k-rap','kpop','korean pop','korean r&b','korean hip hop'] },
-  { id: 'game',    name: 'Game OSTs',        color: '#7b61ff', genres: ['video game music','game','chiptune','soundtrack','ost','orchestral game','game ost','video game'] },
-  { id: 'rap',     name: 'Rap & R&B',        color: '#ffd60a', genres: ['hip hop','rap','r&b','trap','soul','neo soul','rnb','urban contemporary','conscious hip hop','southern hip hop','west coast rap','east coast hip hop','gangster rap','melodic rap','alternative hip hop'] },
-  { id: 'ballad',  name: 'Ballads',          color: '#ff8fa3', genres: ['ballad','singer-songwriter','acoustic','soft','adult contemporary','easy listening','lounge'] },
-  { id: 'edm',     name: 'EDM / Electronic', color: '#00ff88', genres: ['edm','electronic','dance','house','techno','trance','dubstep','drum and bass','dnb','electro','synthwave','hyperpop','future bass','lo-fi','ambient electronic','electropop','synth-pop','electropop','disco','funk'] },
-  { id: 'misc',    name: 'Misc',             color: '#888888', genres: [] },
+  { id: 'rock',   name: 'Rock / Screamo',   color: '#ff6b35', genres: ['rock','punk','metal','screamo','emo','alternative','hardcore','grunge','pop punk','indie rock','post-hardcore','metalcore','post-rock','garage rock','psych rock','classic rock','hard rock','soft rock','folk rock'] },
+  { id: 'jmusic', name: 'J-Music',          color: '#ff3cac', genres: ['j-pop','j-rock','j-indie','anime','vocaloid','japanese','city pop','shibuya-kei','visual kei','j-metal','j-dance','jpop','jrock'] },
+  { id: 'kpop',   name: 'K-Pop / Korean',   color: '#00d4ff', genres: ['k-pop','korean','k-indie','k-r&b','k-rap','kpop','korean pop','korean r&b','korean hip hop'] },
+  { id: 'game',   name: 'OST / Soundtrack',  color: '#7b61ff', genres: ['video game music','game','chiptune','soundtrack','ost','orchestral game','game ost','video game','film score','movie','television','musical','broadway','show tunes','anime soundtrack','disney','studio ghibli','tv soundtrack','motion picture','cinematic','orchestral film'] },
+  { id: 'rap',    name: 'Rap & Hip-Hop',    color: '#ffd60a', genres: ['hip hop','rap','trap','conscious hip hop','southern hip hop','west coast rap','east coast hip hop','gangster rap','melodic rap','alternative hip hop','drill','boom bap','mumble rap','crunk','grime'] },
+  { id: 'rnb',    name: 'R&B / Soul',       color: '#ff9a3c', genres: ['r&b','soul','neo soul','rnb','urban contemporary','motown','quiet storm','contemporary r&b','rhythm and blues','new jack swing'] },
+  { id: 'afro',   name: 'Afro / Afrobeats',  color: '#ff6b00', genres: ['afrobeats','afropop','afro pop','afro','afroswing','afro swing','afro house','afro dancehall','afro soul','afrobeat','afro r&b','afro trap','nigerian pop','ghana','west african','amapiano','highlife','afrojuju','afrofusion','african pop','afro fusion'] },
+  { id: 'pop',    name: 'Pop',              color: '#c8ff00', genres: ['pop','dance pop','electropop','synth-pop','indie pop','power pop','art pop','bubblegum pop','teen pop','adult pop','chamber pop','dream pop'] },
+  { id: 'ballad', name: 'Ballads',          color: '#ff8fa3', genres: ['ballad','singer-songwriter','acoustic','soft','adult contemporary','easy listening','lounge'] },
+  { id: 'edm',    name: 'EDM / Electronic', color: '#00ff88', genres: ['edm','electronic','dance','house','techno','trance','dubstep','drum and bass','dnb','electro','synthwave','hyperpop','future bass','lo-fi','ambient electronic','disco','funk'] },
+  { id: 'misc',   name: 'Misc',             color: '#888888', genres: [] },
 ];
 
 // ─── STATE ────────────────────────────────────────────────────────────────
@@ -927,15 +930,27 @@ function categorizeSong(song) {
   if (/korean|korea|\ud55c\uad6d/.test(artist)) scores.kpop += 5;
   if (genres.some(g => /vocaloid|hatsune|miku|kagamine|kaito|meiko/.test(g))) scores.jmusic += 8;
   if (genres.some(g => /k-pop|kpop/.test(g))) scores.kpop += 6;
-  if (genres.some(g => /soundtrack|ost|video game/.test(g))) scores.game += 6;
+  if (genres.some(g => /soundtrack|ost|video game|film score|musical|broadway|television|cinematic|motion picture/.test(g))) scores.game += 6;
 
-  // Ballad detection: low energy implied by genre keywords
+  // Rap vs R&B separation
+  if (genres.some(g => /\bhip hop\b|\brap\b|\btrap\b|\bdrill\b|\bboom bap\b/.test(g))) scores.rap += 4;
+  if (genres.some(g => /\br&b\b|\brnb\b|\bsoul\b|\bneo soul\b|\burban contemporary\b/.test(g))) scores.rnb += 4;
+
+  // Afro boost
+  if (genres.some(g => /afrobeats|afropop|afrobeat|afroswing|amapiano|highlife|afro/.test(g))) scores.afro += 6;
+
+  // Pop boost — generic pop without rap/rock/edm
+  if (genres.some(g => /\bpop\b/.test(g)) && !genres.some(g => /rock|punk|metal|hip hop|rap|edm|electronic|dance/.test(g))) {
+    scores.pop += 3;
+  }
+
+  // Ballad detection
   if (genres.some(g => /ballad|acoustic|singer-songwriter/.test(g)) && !genres.some(g => /rock|metal|punk|electronic|dance/.test(g))) {
     scores.ballad += 4;
   }
 
-  // Priority: J-Music > K-Pop > Game > Ballad > Rap > Rock > EDM
-  const priority = ['jmusic','kpop','game','ballad','rap','rock','edm'];
+  // Priority: J-Music > K-Pop > Game > Ballad > R&B > Rap > Pop > Rock > EDM
+  const priority = ['jmusic','kpop','game','ballad','rnb','rap','afro','pop','rock','edm'];
   const maxScore = Math.max(...Object.values(scores));
 
   if (maxScore === 0) return 'misc';
