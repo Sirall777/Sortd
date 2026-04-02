@@ -583,6 +583,182 @@
 
   .hidden { display: none !important; }
 
+  /* EMERGENCY BUTTON */
+  .btn-emergency {
+    background: transparent;
+    color: var(--accent2);
+    border: 1px solid var(--accent2);
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 14px 28px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-emergency:hover { background: var(--accent2); color: #000; }
+  .btn-emergency:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn-emergency.running {
+    animation: emergencePulse 1s infinite;
+  }
+  @keyframes emergencePulse {
+    0%, 100% { border-color: var(--accent2); color: var(--accent2); }
+    50% { border-color: #fff; color: #fff; }
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.15s ease;
+  }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    width: 480px;
+    max-width: 90vw;
+    padding: 36px;
+    position: relative;
+    animation: slideUp 0.2s ease;
+  }
+
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    margin-bottom: 4px;
+    letter-spacing: -0.5px;
+  }
+
+  .modal-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 20px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  .modal .field { margin-bottom: 16px; }
+
+  .modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+  }
+
+  .modal-actions .btn-create {
+    flex: 1;
+    margin-top: 0;
+    width: auto;
+  }
+
+  .modal-actions .btn-outline {
+    margin-top: 0;
+  }
+
+  select.reassign-select-lg {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 12px 14px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  select.reassign-select-lg:focus { border-color: var(--accent); }
+
+  .sort-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .sort-opt {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+  }
+
+  .sort-opt:hover { border-color: var(--accent); color: var(--text); }
+  .sort-opt.selected { border-color: var(--accent); color: var(--accent); background: rgba(200,255,0,0.05); }
+
+  /* CATEGORY ADDER TAG INPUTS */
+  .tag-input-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 8px;
+    min-height: 44px;
+    cursor: text;
+  }
+
+  .tag-input-wrap:focus-within { border-color: var(--accent); }
+
+  .tag-chip {
+    background: var(--border);
+    color: var(--text);
+    font-size: 11px;
+    padding: 3px 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .tag-chip button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .tag-chip button:hover { color: var(--accent2); }
+
+  .tag-input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    flex: 1;
+    min-width: 120px;
+  }
+
   /* TOAST */
   .toast {
     position: fixed;
@@ -705,8 +881,85 @@
         <div class="pagination" id="pagination"></div>
 
         <div class="action-bar">
-          <button class="btn-create" id="btn-create" onclick="createPlaylists()">Create Playlists on Spotify</button>
+          <button class="btn-create" id="btn-create" onclick="createPlaylists()">Create All Playlists</button>
+          <button class="btn-outline" id="btn-create-single" onclick="openCreateModal()">Create Playlist</button>
+          <button class="btn-outline" onclick="openAddCatModal()">+ Category</button>
+          <button class="btn-outline" onclick="resortAll()">Re-sort</button>
           <button class="btn-outline" onclick="exportCSV()">Export CSV</button>
+          <button class="btn-emergency" id="btn-emergency" onclick="emergencyClaudePass()">Sort this Claude</button>
+        </div>
+      </div>
+
+      <!-- CREATE PLAYLIST MODAL -->
+      <div id="create-modal" class="modal-overlay hidden">
+        <div class="modal">
+          <button class="modal-close" onclick="closeModal('create-modal')">×</button>
+          <div class="modal-title">Create Playlist</div>
+          <div class="modal-sub" id="create-modal-sub">Creating playlist for selected bucket</div>
+
+          <div class="field">
+            <label>Playlist Name</label>
+            <input type="text" id="pl-name" placeholder="e.g. My Rock Playlist" style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:12px 14px;outline:none;">
+          </div>
+
+          <div class="field">
+            <label>Description (optional)</label>
+            <input type="text" id="pl-desc" placeholder="Add a description..." style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:12px 14px;outline:none;">
+          </div>
+
+          <div class="field">
+            <label>Sort Order</label>
+            <div class="sort-options" id="sort-options">
+              <div class="sort-opt selected" data-sort="year-desc" onclick="selectSort(this)">Newest → Oldest</div>
+              <div class="sort-opt" data-sort="year-asc" onclick="selectSort(this)">Oldest → Newest</div>
+              <div class="sort-opt" data-sort="title-asc" onclick="selectSort(this)">A → Z by Title</div>
+              <div class="sort-opt" data-sort="artist-asc" onclick="selectSort(this)">A → Z by Artist</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Visibility</label>
+            <select class="reassign-select-lg" id="pl-visibility">
+              <option value="false">Private</option>
+              <option value="true">Public</option>
+            </select>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-create" onclick="confirmCreatePlaylist()">Create on Spotify</button>
+            <button class="btn-outline" onclick="closeModal('create-modal')">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADD CATEGORY MODAL -->
+      <div id="addcat-modal" class="modal-overlay hidden">
+        <div class="modal">
+          <button class="modal-close" onclick="closeModal('addcat-modal')">×</button>
+          <div class="modal-title">Add Category</div>
+          <div class="modal-sub">Create a new bucket and define its genre keywords</div>
+
+          <div class="field">
+            <label>Category Name</label>
+            <input type="text" id="cat-name" placeholder="e.g. Latin, Classical, Country..." style="width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:'DM Mono',monospace;font-size:13px;padding:12px 14px;outline:none;">
+          </div>
+
+          <div class="field">
+            <label>Accent Color</label>
+            <input type="color" id="cat-color" value="#ffffff" style="width:100%;height:44px;background:var(--surface2);border:1px solid var(--border);cursor:pointer;padding:4px;">
+          </div>
+
+          <div class="field">
+            <label>Genre Keywords (press Enter to add)</label>
+            <div class="tag-input-wrap" id="genre-tag-wrap" onclick="document.getElementById('genre-tag-input').focus()">
+              <input class="tag-input" id="genre-tag-input" placeholder="Type a genre and press Enter..." onkeydown="handleTagInput(event)">
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-create" onclick="confirmAddCategory()">Add Category</button>
+            <button class="btn-outline" onclick="closeModal('addcat-modal')">Cancel</button>
+          </div>
         </div>
       </div>
 
@@ -725,6 +978,7 @@
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
 const REDIRECT_URI = 'https://sirall777.github.io/Sortd';
+const LASTFM_KEY = '7e9a79ed3b4fbc82f75368e212d4fb3f';
 const SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
@@ -895,8 +1149,8 @@ async function fetchPlaylist() {
       s.bucket = categorizeSong(s);
     });
 
-    // Second pass: fetch audio features for misc songs
-    const miscSongs = allSongs.filter(s => s.bucket === 'misc');
+    // ── PASS 2: Audio Features ──
+    let miscSongs = allSongs.filter(s => s.bucket === 'misc');
     log(`${miscSongs.length} uncategorized — running audio features pass...`, 'current');
 
     const miscIds = miscSongs.map(s => s.id);
@@ -910,16 +1164,68 @@ async function fetchPlaylist() {
       log(`Audio features: ${Math.min(i+100, miscIds.length)}/${miscIds.length}`, 'current');
     }
 
-    // Re-categorize misc songs using audio features + title/artist heuristics
     miscSongs.forEach(s => {
       const af = audioFeatures[s.id];
       const result = categorizeByAudioFeatures(s, af);
       if (result !== 'misc') s.bucket = result;
     });
 
-    const stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
-    log(`Audio features pass complete — ${miscSongs.length - stillMisc} songs rescued from Misc`, 'done');
-    log('Categorization complete!', 'done');
+    let stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
+    log(`Audio features pass — ${miscSongs.length - stillMisc} rescued, ${stillMisc} remaining`, 'done');
+
+    // ── PASS 3: MusicBrainz ──
+    miscSongs = allSongs.filter(s => s.bucket === 'misc');
+    log(`Running MusicBrainz pass on ${miscSongs.length} songs...`, 'current');
+    const mbArtistCache = {};
+    let mbRescued = 0;
+    for (let i = 0; i < miscSongs.length; i++) {
+      const s = miscSongs[i];
+      const cacheKey = s.artist.toLowerCase();
+      let tags = mbArtistCache[cacheKey];
+      if (!tags) {
+        tags = await fetchMusicBrainzTags(s.artist);
+        mbArtistCache[cacheKey] = tags;
+      }
+      if (tags.length > 0) {
+        const bucket = categorizeByTags(tags);
+        if (bucket !== 'misc') { s.bucket = bucket; mbRescued++; }
+      }
+      if (i % 20 === 0) log(`MusicBrainz: ${i}/${miscSongs.length}...`, 'current');
+      await sleep(80); // rate limit
+    }
+    stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
+    log(`MusicBrainz pass — ${mbRescued} rescued, ${stillMisc} remaining`, 'done');
+
+    // ── PASS 4: Last.fm ──
+    miscSongs = allSongs.filter(s => s.bucket === 'misc');
+    if (LASTFM_KEY && miscSongs.length > 0) {
+      log(`Running Last.fm pass on ${miscSongs.length} songs...`, 'current');
+      const lfmCache = {};
+      let lfmRescued = 0;
+      for (let i = 0; i < miscSongs.length; i++) {
+        const s = miscSongs[i];
+        const cacheKey = s.artist.toLowerCase();
+        let tags = lfmCache[cacheKey];
+        if (!tags) {
+          tags = await fetchLastFmTags(s.artist, s.title);
+          lfmCache[cacheKey] = tags;
+        }
+        if (tags.length > 0) {
+          const bucket = categorizeByTags(tags);
+          if (bucket !== 'misc') { s.bucket = bucket; lfmRescued++; }
+        }
+        if (i % 20 === 0) log(`Last.fm: ${i}/${miscSongs.length}...`, 'current');
+        await sleep(120); // rate limit
+      }
+      stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
+      log(`Last.fm pass — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
+    } else if (!LASTFM_KEY) {
+      log('No Last.fm key — skipping Last.fm pass', '');
+    }
+
+    const totalMisc = allSongs.filter(s => s.bucket === 'misc').length;
+    const pct = ((totalMisc / allSongs.length) * 100).toFixed(1);
+    log(`All passes complete — ${totalMisc} songs in Misc (${pct}%)`, 'done');
     log('Building review interface...', 'current');
 
     updateStats();
@@ -932,6 +1238,138 @@ async function fetchPlaylist() {
     log('Error: ' + e.message, 'error');
     showToast(e.message, 'error');
   }
+}
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function fetchMusicBrainzTags(artistName) {
+  try {
+    const res = await fetch(`https://musicbrainz.org/ws/2/artist/?query=artist:"${encodeURIComponent(artistName)}"&fmt=json&limit=1`, {
+      headers: { 'User-Agent': 'SORTD/1.0 (playlist-sorter)' }
+    });
+    const data = await res.json();
+    const artist = data.artists?.[0];
+    if (!artist) return [];
+    const tags = (artist.tags || []).map(t => t.name.toLowerCase());
+    const genres = (artist.genres || []).map(g => g.name.toLowerCase());
+    return [...new Set([...tags, ...genres])];
+  } catch(e) { return []; }
+}
+
+async function fetchLastFmTags(artistName, trackName) {
+  if (!LASTFM_KEY) return [];
+  try {
+    // Try track tags first, fall back to artist tags
+    const trackRes = await fetch(`https://ws.audioscrobbler.com/2.0/?method=track.gettoptags&artist=${encodeURIComponent(artistName)}&track=${encodeURIComponent(trackName)}&api_key=${LASTFM_KEY}&format=json`);
+    const trackData = await trackRes.json();
+    const trackTags = (trackData.toptags?.tag || []).map(t => t.name.toLowerCase());
+    if (trackTags.length > 2) return trackTags;
+
+    // Fall back to artist tags
+    const artistRes = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}&api_key=${LASTFM_KEY}&format=json`);
+    const artistData = await artistRes.json();
+    return (artistData.toptags?.tag || []).map(t => t.name.toLowerCase());
+  } catch(e) { return []; }
+}
+
+function categorizeByTags(tags) {
+  const t = tags.join(' ');
+  // Order matters — most specific first
+  if (/afrobeats|afropop|afroswing|amapiano|afrobeat|highlife|afro pop|afro house/.test(t)) return 'afro';
+  if (/k-pop|kpop|korean pop|k pop/.test(t)) return 'kpop';
+  if (/j-pop|jpop|j-rock|jrock|vocaloid|anime|japanese pop|japanese rock/.test(t)) return 'jmusic';
+  if (/video game|game music|chiptune|game ost|video game music/.test(t)) return 'game';
+  if (/film score|movie soundtrack|musical theatre|broadway|television music|cinematic/.test(t)) return 'game';
+  if (/hip.?hop|rap|trap|drill|grime|boom bap/.test(t)) return 'rap';
+  if (/r&b|rnb|neo soul|soul|urban contemporary|rhythm and blues/.test(t)) return 'rnb';
+  if (/metal|punk|screamo|hardcore|post-hardcore|metalcore|emo|grunge/.test(t)) return 'rock';
+  if (/rock(?! steady)|alternative rock|indie rock|classic rock|hard rock|pop rock/.test(t)) return 'rock';
+  if (/edm|electronic dance|house|techno|trance|dubstep|drum and bass|synthwave|hyperpop|future bass/.test(t)) return 'edm';
+  if (/ballad|singer.songwriter|acoustic|easy listening|adult contemporary|soft rock/.test(t)) return 'ballad';
+  if (/pop/.test(t)) return 'pop';
+  return 'misc';
+}
+
+// ─── EMERGENCY CLAUDE PASS ────────────────────────────────────────────────
+async function emergencyClaudePass() {
+  const miscSongs = allSongs.filter(s => s.bucket === 'misc');
+  if (miscSongs.length === 0) { showToast('No misc songs to sort!', 'success'); return; }
+
+  const btn = document.getElementById('btn-emergency');
+  btn.disabled = true;
+  btn.classList.add('running');
+  btn.textContent = 'Sorting...';
+
+  const BATCH = 40;
+  let rescued = 0;
+  const bucketNames = ['rock','jmusic','kpop','game','rap','rnb','pop','ballad','edm','afro','misc'];
+
+  for (let i = 0; i < miscSongs.length; i += BATCH) {
+    const batch = miscSongs.slice(i, i + BATCH);
+    const songList = batch.map((s, idx) => `${idx + 1}. "${s.title}" by ${s.artist} (${s.year})`).join('
+');
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: `You are a music categorization expert. Categorize each song into exactly one of these buckets:
+- rock: rock, punk, metal, screamo, emo, alternative, hardcore, grunge, pop punk
+- jmusic: J-pop, J-rock, anime OSTs, Vocaloid, any Japanese music
+- kpop: K-pop, K-R&B, K-indie, any Korean music
+- game: video game OSTs, film scores, TV soundtracks, musical theatre
+- rap: hip-hop, rap, trap, drill, grime
+- rnb: R&B, soul, neo soul, urban contemporary
+- pop: mainstream pop, indie pop, synth-pop, dance pop
+- ballad: slow emotional songs, singer-songwriter, acoustic, adult contemporary
+- edm: EDM, electronic dance, house, techno, trance, dubstep, synthwave, hyperpop
+- afro: Afrobeats, Afropop, Afroswing, Amapiano, Nigerian pop, West African music
+- misc: truly unclassifiable
+
+Respond ONLY with a JSON array of bucket IDs in the same order as the songs. Example: ["pop","rap","rock"]
+No explanation, no markdown, just the raw JSON array.`,
+          messages: [{ role: 'user', content: `Categorize these songs:
+${songList}` }]
+        })
+      });
+
+      const data = await res.json();
+      const text = data.content?.[0]?.text?.trim() || '[]';
+      const clean = text.replace(/```json|```/g, '').trim();
+      const results = JSON.parse(clean);
+
+      results.forEach((bucketId, idx) => {
+        if (batch[idx] && bucketNames.includes(bucketId) && bucketId !== 'misc') {
+          batch[idx].bucket = bucketId;
+          rescued++;
+        }
+      });
+
+      showToast(`Claude sorted batch ${Math.floor(i/BATCH)+1} — ${rescued} rescued so far`, 'success');
+    } catch(e) {
+      showToast(`Batch ${Math.floor(i/BATCH)+1} failed: ${e.message}`, 'error');
+    }
+
+    await sleep(500);
+  }
+
+  const remaining = allSongs.filter(s => s.bucket === 'misc').length;
+  const pct = ((remaining / allSongs.length) * 100).toFixed(1);
+
+  btn.disabled = false;
+  btn.classList.remove('running');
+  btn.textContent = 'Sort this Claude';
+
+  updateStats();
+  renderBucketNav();
+  renderBucketsGrid();
+  renderTable();
+
+  showToast(`Done! ${rescued} rescued — ${remaining} still in Misc (${pct}%)`, 'success');
 }
 
 // ─── AUDIO FEATURES CATEGORIZATION ───────────────────────────────────────────
@@ -1276,6 +1714,125 @@ function showToast(msg, type = '') {
 
 function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── MODAL HELPERS ────────────────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function openCreateModal() {
+  const b = BUCKETS.find(bk => bk.id === currentBucket);
+  const songs = currentBucket === 'all' ? allSongs : allSongs.filter(s => s.bucket === currentBucket);
+  const name = b ? `SORTD — ${b.name}` : 'SORTD — My Playlist';
+  document.getElementById('pl-name').value = name;
+  document.getElementById('pl-desc').value = '';
+  document.getElementById('create-modal-sub').textContent = `${songs.length.toLocaleString()} songs from ${b ? b.name : 'All'}`;
+  document.getElementById('create-modal').classList.remove('hidden');
+}
+
+function selectSort(el) {
+  document.querySelectorAll('.sort-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+async function confirmCreatePlaylist() {
+  const name = document.getElementById('pl-name').value.trim();
+  if (!name) { showToast('Enter a playlist name', 'error'); return; }
+
+  const sortKey = document.querySelector('.sort-opt.selected')?.dataset.sort || 'year-desc';
+  const isPublic = document.getElementById('pl-visibility').value === 'true';
+  const desc = document.getElementById('pl-desc').value.trim();
+
+  let songs = currentBucket === 'all' ? [...allSongs] : allSongs.filter(s => s.bucket === currentBucket);
+
+  // Sort
+  const [sk, sd] = sortKey.split('-');
+  songs.sort((a, b) => {
+    const av = a[sk] || ''; const bv = b[sk] || '';
+    return sd === 'desc' ? bv.localeCompare(av) : av.localeCompare(bv);
+  });
+
+  closeModal('create-modal');
+  showToast('Creating playlist...', '');
+
+  try {
+    const me = await spotifyGet('/me');
+    const pl = await spotifyPost(`/users/${me.id}/playlists`, { name, public: isPublic, description: desc || `Sorted by SORTD • ${songs.length} tracks` });
+    const ids = songs.map(s => `spotify:track:${s.id}`);
+    for (let i = 0; i < ids.length; i += 100) {
+      await spotifyPost(`/playlists/${pl.id}/tracks`, { uris: ids.slice(i, i+100) });
+    }
+    showToast(`Created "${name}" with ${songs.length} tracks`, 'success');
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'error');
+  }
+}
+
+// ─── ADD CATEGORY ─────────────────────────────────────────────────────────────
+let pendingTags = [];
+
+function openAddCatModal() {
+  pendingTags = [];
+  document.getElementById('cat-name').value = '';
+  document.getElementById('cat-color').value = '#ffffff';
+  document.getElementById('genre-tag-wrap').querySelectorAll('.tag-chip').forEach(e => e.remove());
+  document.getElementById('genre-tag-input').value = '';
+  document.getElementById('addcat-modal').classList.remove('hidden');
+}
+
+function handleTagInput(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = e.target.value.trim().toLowerCase().replace(/,$/, '');
+    if (val && !pendingTags.includes(val)) {
+      pendingTags.push(val);
+      const chip = document.createElement('div');
+      chip.className = 'tag-chip';
+      chip.dataset.tag = val;
+      chip.innerHTML = `${val}<button onclick="removeTag('${val}', this.parentElement)">×</button>`;
+      document.getElementById('genre-tag-wrap').insertBefore(chip, e.target);
+    }
+    e.target.value = '';
+  }
+}
+
+function removeTag(tag, chip) {
+  pendingTags = pendingTags.filter(t => t !== tag);
+  chip.remove();
+}
+
+function confirmAddCategory() {
+  const name = document.getElementById('cat-name').value.trim();
+  const color = document.getElementById('cat-color').value;
+  if (!name) { showToast('Enter a category name', 'error'); return; }
+
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 16);
+  if (BUCKETS.find(b => b.id === id)) { showToast('Category already exists', 'error'); return; }
+
+  // Insert before misc
+  const miscIdx = BUCKETS.findIndex(b => b.id === 'misc');
+  BUCKETS.splice(miscIdx, 0, { id, name, color, genres: [...pendingTags] });
+
+  // Re-categorize songs that might match new category
+  let rescued = 0;
+  allSongs.forEach(s => {
+    const genres = s.genres.map(g => g.toLowerCase());
+    const matched = pendingTags.some(tag => genres.some(g => g.includes(tag) || tag.includes(g)));
+    if (matched && s.bucket === 'misc') { s.bucket = id; rescued++; }
+  });
+
+  closeModal('addcat-modal');
+  updateStats();
+  renderBucketNav();
+  renderBucketsGrid();
+  renderTable();
+  showToast(`Added "${name}" — ${rescued} songs moved from Misc`, 'success');
+}
+
+// ─── RE-SORT ──────────────────────────────────────────────────────────────────
+async function resortAll() {
+  if (!confirm('Re-run all categorization passes from scratch? This will take a few minutes.')) return;
+  allSongs.forEach(s => s.bucket = null);
+  await fetchPlaylist();
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
