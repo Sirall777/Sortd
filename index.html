@@ -598,16 +598,22 @@
     transition: all 0.15s;
     position: relative;
     overflow: hidden;
+    white-space: nowrap;
   }
   .btn-emergency:hover { background: var(--accent2); color: #000; }
   .btn-emergency:disabled { opacity: 0.3; cursor: not-allowed; }
-  .btn-emergency.running {
-    animation: emergencePulse 1s infinite;
-  }
+  .btn-emergency.running { animation: emergencePulse 1s infinite; }
   @keyframes emergencePulse {
     0%, 100% { border-color: var(--accent2); color: var(--accent2); }
     50% { border-color: #fff; color: #fff; }
   }
+
+  .btn-create, .btn-outline, .btn-emergency {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .action-bar { flex-wrap: wrap; }
 
   /* MODAL */
   .modal-overlay {
@@ -807,10 +813,16 @@
     <input type="password" id="client-secret" placeholder="32-character client secret" autocomplete="off">
   </div>
 
+  <div class="field" style="margin-top:28px;padding-top:28px;border-top:1px solid var(--border)">
+    <label>Anthropic API Key <span style="color:var(--muted);font-size:10px;letter-spacing:1px">(optional — enables "Sort this Claude")</span></label>
+    <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off">
+  </div>
+
   <button class="btn" onclick="startAuth()">Connect to Spotify</button>
 
   <p class="note">
-    Need credentials? Go to <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a> → Create App → set redirect URI to <strong>http://localhost:3000/callback</strong> (or the URL of this file).
+    Spotify credentials: <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a> → Create App → redirect URI: <strong>https://sirall777.github.io/Sortd</strong><br><br>
+    Anthropic API key: <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys (optional but recommended)
   </p>
 </div>
 
@@ -1019,6 +1031,8 @@ function startAuth() {
 
   sessionStorage.setItem('spotify_client_id', clientId);
   sessionStorage.setItem('spotify_client_secret', secret);
+  const anthropicKey = document.getElementById('anthropic-key').value.trim();
+  if (anthropicKey) sessionStorage.setItem('anthropic_key', anthropicKey);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -1175,24 +1189,32 @@ async function fetchPlaylist() {
 
     // ── PASS 3: MusicBrainz ──
     miscSongs = allSongs.filter(s => s.bucket === 'misc');
-    log(`Running MusicBrainz pass on ${miscSongs.length} songs...`, 'current');
+
+    // Deduplicate artists — only fetch each unique artist once
+    const uniqueMbArtists = [...new Set(miscSongs.map(s => s.artist.toLowerCase()))];
+    log(`Running MusicBrainz pass — ${uniqueMbArtists.length} unique artists (${miscSongs.length} songs)...`, 'current');
+
     const mbArtistCache = {};
+    for (let i = 0; i < uniqueMbArtists.length; i++) {
+      const artistKey = uniqueMbArtists[i];
+      // Find original casing for the API call
+      const originalArtist = miscSongs.find(s => s.artist.toLowerCase() === artistKey)?.artist || artistKey;
+      const tags = await fetchMusicBrainzTags(originalArtist);
+      mbArtistCache[artistKey] = tags;
+      if (i % 10 === 0) log(`MusicBrainz: ${i}/${uniqueMbArtists.length} artists...`, 'current');
+      await sleep(1100); // MusicBrainz allows 1 req/sec — stay just under
+    }
+
+    // Apply cached tags to all misc songs
     let mbRescued = 0;
-    for (let i = 0; i < miscSongs.length; i++) {
-      const s = miscSongs[i];
-      const cacheKey = s.artist.toLowerCase();
-      let tags = mbArtistCache[cacheKey];
-      if (!tags) {
-        tags = await fetchMusicBrainzTags(s.artist);
-        mbArtistCache[cacheKey] = tags;
-      }
+    miscSongs.forEach(s => {
+      const tags = mbArtistCache[s.artist.toLowerCase()] || [];
       if (tags.length > 0) {
         const bucket = categorizeByTags(tags);
         if (bucket !== 'misc') { s.bucket = bucket; mbRescued++; }
       }
-      if (i % 20 === 0) log(`MusicBrainz: ${i}/${miscSongs.length}...`, 'current');
-      await sleep(80); // rate limit
-    }
+    });
+
     stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
     log(`MusicBrainz pass — ${mbRescued} rescued, ${stillMisc} remaining`, 'done');
 
@@ -1310,11 +1332,13 @@ async function emergencyClaudePass() {
     const songList = batch.map((s, idx) => (idx + 1) + '. "' + s.title + '" by ' + s.artist + ' (' + s.year + ')').join('\n');
 
     try {
+      const anthropicKey = sessionStorage.getItem('anthropic_key') || '';
+      if (!anthropicKey) { showToast('No Anthropic API key — add it on the login screen', 'error'); break; }
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6-20251101',
           max_tokens: 1000,
           system: `You are a music categorization expert. Categorize each song into exactly one of these buckets:
 - rock: rock, punk, metal, screamo, emo, alternative, hardcore, grunge, pop punk
@@ -1393,37 +1417,58 @@ function categorizeByAudioFeatures(song, af) {
   // ── Title heuristics ──
   if (/opening|ending|ost|theme song|main theme|insert song|bgm|soundtrack/.test(title)) return 'game';
 
-  // ── Audio features fallback (when af data exists) ──
+  // ── Audio features fallback ──
   if (!af) return 'misc';
 
-  const { energy, danceability, acousticness, valence, tempo, speechiness, instrumentalness } = af;
+  const { energy, danceability, acousticness, valence, tempo, speechiness, instrumentalness, loudness } = af;
 
-  // Instrumental + low speech = likely OST
-  if (instrumentalness > 0.7 && speechiness < 0.1) return 'game';
+  // Pure instrumental = OST/classical
+  if (instrumentalness > 0.85 && speechiness < 0.05) return 'game';
+  if (instrumentalness > 0.6 && speechiness < 0.04 && energy < 0.6) return 'game';
 
-  // High speech = rap
-  if (speechiness > 0.2 && energy > 0.4) return 'rap';
+  // Strong rap signal — high speechiness
+  if (speechiness > 0.33) return 'rap';
+  if (speechiness > 0.18 && energy > 0.45 && danceability > 0.55) return 'rap';
+  if (speechiness > 0.12 && energy > 0.6 && danceability > 0.7 && acousticness < 0.1) return 'rap';
 
-  // High energy + high danceability = EDM
-  if (energy > 0.8 && danceability > 0.7 && acousticness < 0.15) return 'edm';
+  // Hard rock/metal — very high energy, loud, not danceable
+  if (energy > 0.88 && danceability < 0.52 && acousticness < 0.08) return 'rock';
+  if (energy > 0.8 && danceability < 0.48 && acousticness < 0.12 && loudness > -5) return 'rock';
+  if (energy > 0.75 && danceability < 0.45 && acousticness < 0.15) return 'rock';
 
-  // High energy + low danceability = rock
-  if (energy > 0.75 && danceability < 0.55 && acousticness < 0.2) return 'rock';
+  // Hard EDM — max energy + max danceability
+  if (energy > 0.85 && danceability > 0.72 && acousticness < 0.08) return 'edm';
+  if (energy > 0.78 && danceability > 0.78 && acousticness < 0.12) return 'edm';
+  if (tempo > 128 && energy > 0.7 && danceability > 0.68 && acousticness < 0.1) return 'edm';
 
-  // Very acoustic + low energy = ballad
-  if (acousticness > 0.7 && energy < 0.4) return 'ballad';
+  // Ballad — acoustic, low energy, slow
+  if (acousticness > 0.85 && energy < 0.45) return 'ballad';
+  if (acousticness > 0.7 && energy < 0.35) return 'ballad';
+  if (acousticness > 0.55 && energy < 0.28) return 'ballad';
+  if (energy < 0.22 && danceability < 0.5) return 'ballad';
+  if (energy < 0.3 && acousticness > 0.4 && tempo < 90) return 'ballad';
 
-  // Moderate energy + high danceability + mid tempo = R&B/Afro zone
-  if (danceability > 0.65 && energy > 0.45 && energy < 0.78 && tempo > 85 && tempo < 130) {
-    // Slightly higher danceability leans afro, lower leans rnb
-    return danceability > 0.75 ? 'afro' : 'rnb';
-  }
+  // Afrobeats — groove-heavy, tight tempo range, high danceability
+  if (danceability > 0.8 && energy > 0.58 && energy < 0.88 && tempo > 88 && tempo < 122 && speechiness < 0.18) return 'afro';
+  if (danceability > 0.75 && energy > 0.62 && tempo > 92 && tempo < 115 && acousticness < 0.25) return 'afro';
 
-  // Mid energy + decent danceability = pop
-  if (energy > 0.4 && energy < 0.8 && danceability > 0.55 && acousticness < 0.5) return 'pop';
+  // R&B — moderately danceable, mid energy, smooth
+  if (danceability > 0.65 && energy > 0.38 && energy < 0.75 && acousticness < 0.4 && speechiness < 0.14 && tempo < 125) return 'rnb';
+  if (danceability > 0.58 && energy > 0.32 && energy < 0.68 && valence > 0.25 && speechiness < 0.12) return 'rnb';
 
-  // Low energy + mid acousticness = ballad
-  if (energy < 0.35 && acousticness > 0.3) return 'ballad';
+  // Pop — broad middle ground, catch-all for vocal melodic music
+  if (energy > 0.42 && energy < 0.86 && danceability > 0.48 && acousticness < 0.55 && speechiness < 0.14) return 'pop';
+  if (energy > 0.35 && danceability > 0.58 && acousticness < 0.45) return 'pop';
+
+  // Soft pop / slow pop
+  if (energy < 0.42 && danceability > 0.42 && acousticness < 0.6) return 'pop';
+
+  // Anything remaining low energy = ballad
+  if (energy < 0.45 && acousticness > 0.25) return 'ballad';
+  if (energy < 0.32) return 'ballad';
+
+  // Anything with decent danceability remaining = pop
+  if (danceability > 0.42) return 'pop';
 
   return 'misc';
 }
