@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORTD v1.8 — Playlist Sorter</title>
+<title>SORTD v2.3 — Playlist Sorter</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1134,6 +1134,7 @@ async function fetchPlaylist() {
         title: i.track.name,
         artist: i.track.artists.map(a => a.name).join(', '),
         artistId: i.track.artists[0]?.id,
+        allArtistIds: i.track.artists.map(a => a.id).filter(Boolean),
         year: (i.track.album.release_date || '0000').substring(0, 4),
         bucket: null,
         genres: []
@@ -1147,7 +1148,7 @@ async function fetchPlaylist() {
     log('Fetching artist genre data...', 'current');
 
     // Batch artist genre fetch
-    const artistIds = [...new Set(allSongs.map(s => s.artistId).filter(Boolean))];
+    const artistIds = [...new Set(allSongs.flatMap(s => s.allArtistIds || [s.artistId]).filter(Boolean))];
     const artistGenres = {};
     for (let i = 0; i < artistIds.length; i += 50) {
       const batch = artistIds.slice(i, i + 50);
@@ -1159,7 +1160,10 @@ async function fetchPlaylist() {
     // Attach genres and first-pass categorize
     log('Categorizing songs...', 'current');
     allSongs.forEach(s => {
-      s.genres = artistGenres[s.artistId] || [];
+      // Combine genres from all artists on the track
+      const allGenres = (s.allArtistIds || [s.artistId])
+        .flatMap(id => artistGenres[id] || []);
+      s.genres = [...new Set(allGenres)];
       s.bucket = categorizeSong(s);
     });
 
@@ -1187,49 +1191,21 @@ async function fetchPlaylist() {
     let stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
     log(`Audio features pass — ${miscSongs.length - stillMisc} rescued, ${stillMisc} remaining`, 'done');
 
-    // ── PASS 3: Last.fm (parallel, artist-deduplicated) ──
+    // ── PASS 3: Last.fm rescue for remaining Misc ──
     miscSongs = allSongs.filter(s => s.bucket === 'misc');
-    if (LASTFM_KEY && miscSongs.length > 0) {
-      // Build artist→representative song map (one lookup per unique artist)
-      const artistSongMap = {};
-      miscSongs.forEach(s => {
-        const key = s.artist.toLowerCase();
-        if (!artistSongMap[key]) artistSongMap[key] = s;
-      });
-      const uniqueEntries = Object.entries(artistSongMap);
-      // Quick test fetch to verify Last.fm is responding
-      try {
-        const testRes = await fetch(`https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=Elton+John&api_key=${LASTFM_KEY}&format=json`);
-        const testData = await testRes.json();
-        const testTags = testData.toptags?.tag?.length || 0;
-        log(`Last.fm API check: ${testTags} tags for Elton John (${testTags > 0 ? 'working' : 'NOT WORKING'})`, testTags > 0 ? 'done' : 'error');
-      } catch(e) { log('Last.fm API check failed: ' + e.message, 'error'); }
-      log(`Last.fm pass — ${uniqueEntries.length} unique artists (${miscSongs.length} songs)...`, 'current');
-
-      const lfmCache = {};
-      const LFM_BATCH = 5; // conservative to avoid silent drops
-      for (let i = 0; i < uniqueEntries.length; i += LFM_BATCH) {
-        const batch = uniqueEntries.slice(i, i + LFM_BATCH);
-        await Promise.all(batch.map(async ([artistKey, s]) => {
-          lfmCache[artistKey] = await fetchLastFmTags(s.artist, s.title);
-        }));
-        if (i % 60 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueEntries.length)}/${uniqueEntries.length} artists...`, 'current');
-        await sleep(200);
-      }
-
+    if (miscSongs.length > 0) {
+      log(`Last.fm rescue pass on ${miscSongs.length} remaining songs...`, 'current');
       let lfmRescued = 0;
       miscSongs.forEach(s => {
-        const tags = lfmCache[s.artist.toLowerCase()] || [];
+        // Use cached tags from pre-pass — try all artists on track
+        const tags = s.artist.split(',').flatMap(a => globalLfmCache[a.trim().toLowerCase()] || []);
         if (tags.length > 0) {
           const bucket = categorizeByTags(tags);
           if (bucket !== 'misc') { s.bucket = bucket; lfmRescued++; }
         }
       });
-
       stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
-      log(`Last.fm pass — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
-    } else if (!LASTFM_KEY) {
-      log('No Last.fm key — skipping (add key on login screen)', '');
+      log(`Last.fm rescue — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
     }
 
     const totalMisc = allSongs.filter(s => s.bucket === 'misc').length;
@@ -1255,12 +1231,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 async function fetchLastFmTags(artistName, trackName) {
   if (!LASTFM_KEY) return [];
   try {
-    const url = `https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artistName)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (data.error) return [];
-    return (data.toptags?.tag || []).map(t => t.name.toLowerCase());
+    // Try each artist in the comma-separated list until we get tags
+    const artists = artistName.split(',').map(a => a.trim());
+    let allTags = [];
+    for (const artist of artists) {
+      const url = `https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artist)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data.error) continue;
+      const tags = (data.toptags?.tag || []).map(t => t.name.toLowerCase());
+      allTags = [...new Set([...allTags, ...tags])];
+      if (allTags.length > 5) break; // enough tags, stop fetching
+    }
+    return allTags;
   } catch(e) { return []; }
 }
 
@@ -1391,14 +1375,7 @@ function categorizeByAudioFeatures(song, af) {
   // Korean hangul
   if (/[가-힯ᄀ-ᇿ]/.test(song.artist + song.title)) return 'kpop';
 
-  // ── Artist name heuristics ──
-  if (/wizkid|burna boy|davido|tems|ckay|rema|omah lay|fireboy|asake|kizz daniel|afrobeats|yemi alade|tiwa savage|mr eazi|olamide|naira marley|zlatan|patoranking|tekno|adekunle gold/.test(artist)) return 'afro';
-  if (/drake|kendrick|travis scott|j\.? cole|future|lil |young |nba |playboi|uzi|21 savage|gunna|offset|metro boomin|roddy ricch|polo g|juice wrld|xxxtentacion|a\$ap|asap|wiz khalifa|snoop|eminem|tyler the creator|childish gambino|chance the rapper|mac miller|logic|big sean|meek mill|joey badass|flatbush|denzel curry|earthgang|dreamville/.test(artist)) return 'rap';
-  if (/beyonce|sza|frank ocean|the weeknd|daniel caesar|jorja smith|h\.e\.r\.|ella mai|summer walker|mahalia|brent faiyaz|giveon|lucky daye|jazmine sullivan|ari lennox|kehlani|tinashe|jhene aiko|doja cat|normani/.test(artist)) return 'rnb';
-  if (/taylor swift|ariana grande|billie eilish|olivia rodrigo|dua lipa|selena gomez|carly rae|katy perry|lady gaga|charlie xcx|charli xcx|sabrina carpenter|gracie abrams|beabadoobee|conan gray|lorde|lana del rey|halsey|melanie martinez/.test(artist)) return 'pop';
-  if (/bring me the horizon|bmth|paramore|my chemical romance|mcr|sleeping with sirens|pierce the veil|falling in reverse|a day to remember|adtr|the used|hawthorne heights|taking back sunday|panic at the disco|fall out boy|twenty one pilots|all time low|simple plan|sum 41|blink.?182|green day|linkin park|system of a down|tool|slipknot|avenged sevenfold|breaking benjamin|three days grace|nickelback|foo fighters|red hot chili peppers|rhcp|imagine dragons/.test(artist)) return 'rock';
-  if (/calvin harris|martin garrix|tiesto|deadmau5|skrillex|diplo|zedd|marshmello|chainsmokers|illenium|kygo|odesza|porter robinson|madeon|disclosure|flume|rezz|subtronics|excision|getter|slander|san holo/.test(artist)) return 'edm';
-  if (/john williams|hans zimmer|howard shore|ennio morricone|danny elfman|joe hisaishi|yoko shimomura|nobuo uematsu|koji kondo|yasunori mitsuda|bear mccreary|ramin djawadi|alexandre desplat/.test(artist)) return 'game';
+  // ── No hardcoded artist names — Last.fm handles all artist lookups ──
 
   // ── Title heuristics ──
   if (/opening|ending|ost|theme song|main theme|insert song|bgm|soundtrack/.test(title)) return 'game';
