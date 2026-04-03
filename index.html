@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORTD v2.5 — Playlist Sorter</title>
+<title>SORTD v2.5.1 — Playlist Sorter</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -988,30 +988,54 @@
 </div>
 
 <script>
+// SORTD v3.0 — Clean rewrite
 // ─── CONFIG ───────────────────────────────────────────────────────────────
 const REDIRECT_URI = 'https://sirall777.github.io/Sortd';
 const LASTFM_KEY = '7e9a79ed3b4fbc82f75368e212d4fb3f';
-const SCOPES = [
-  'playlist-read-private',
-  'playlist-read-collaborative',
-  'playlist-modify-public',
-  'playlist-modify-private',
-  'user-library-read'
-].join(' ');
+const SCOPES = ['playlist-read-private','playlist-read-collaborative','playlist-modify-public','playlist-modify-private','user-library-read'].join(' ');
 
 const BUCKETS = [
-  { id: 'rock',   name: 'Rock / Screamo',   color: '#ff6b35', genres: ['rock','punk','metal','screamo','emo','alternative','hardcore','grunge','pop punk','indie rock','post-hardcore','metalcore','post-rock','garage rock','psych rock','classic rock','hard rock','soft rock','folk rock'] },
-  { id: 'jmusic', name: 'J-Music',          color: '#ff3cac', genres: ['j-pop','j-rock','j-indie','anime','vocaloid','japanese','city pop','shibuya-kei','visual kei','j-metal','j-dance','jpop','jrock'] },
+  { id: 'rock',   name: 'Rock / Screamo',   color: '#ff6b35', genres: ['rock','punk','metal','screamo','emo','alternative','hardcore','grunge','pop punk','indie rock','post-hardcore','metalcore','post-rock','garage rock','classic rock','hard rock','folk rock'] },
+  { id: 'jmusic', name: 'J-Music',          color: '#ff3cac', genres: ['j-pop','j-rock','j-indie','anime','vocaloid','japanese','city pop','shibuya-kei','visual kei','j-metal','jpop','jrock'] },
   { id: 'kpop',   name: 'K-Pop / Korean',   color: '#00d4ff', genres: ['k-pop','korean','k-indie','k-r&b','k-rap','kpop','korean pop','korean r&b','korean hip hop'] },
-  { id: 'game',   name: 'OST / Soundtrack',  color: '#7b61ff', genres: ['video game music','game','chiptune','soundtrack','ost','orchestral game','game ost','video game','film score','movie','television','musical','broadway','show tunes','anime soundtrack','disney','studio ghibli','tv soundtrack','motion picture','cinematic','orchestral film'] },
+  { id: 'game',   name: 'OST / Soundtrack', color: '#7b61ff', genres: ['video game music','game','chiptune','soundtrack','ost','orchestral game','game ost','video game','film score','movie','television','musical','broadway','show tunes','anime soundtrack','disney','studio ghibli','tv soundtrack','motion picture','cinematic','orchestral film'] },
   { id: 'rap',    name: 'Rap & Hip-Hop',    color: '#ffd60a', genres: ['hip hop','rap','trap','conscious hip hop','southern hip hop','west coast rap','east coast hip hop','gangster rap','melodic rap','alternative hip hop','drill','boom bap','mumble rap','crunk','grime'] },
   { id: 'rnb',    name: 'R&B / Soul',       color: '#ff9a3c', genres: ['r&b','soul','neo soul','rnb','urban contemporary','motown','quiet storm','contemporary r&b','rhythm and blues','new jack swing'] },
-  { id: 'afro',   name: 'Afro / Afrobeats',  color: '#ff6b00', genres: ['afrobeats','afropop','afro pop','afro','afroswing','afro swing','afro house','afro dancehall','afro soul','afrobeat','afro r&b','afro trap','nigerian pop','ghana','west african','amapiano','highlife','afrojuju','afrofusion','african pop','afro fusion'] },
+  { id: 'afro',   name: 'Afro / Afrobeats', color: '#ff6b00', genres: ['afrobeats','afropop','afro pop','afroswing','afro swing','afro house','afro soul','afrobeat','afro r&b','afro trap','nigerian pop','ghana','west african','amapiano','highlife','afrofusion','african pop'] },
   { id: 'pop',    name: 'Pop',              color: '#c8ff00', genres: ['pop','dance pop','electropop','synth-pop','indie pop','power pop','art pop','bubblegum pop','teen pop','adult pop','chamber pop','dream pop'] },
   { id: 'ballad', name: 'Ballads',          color: '#ff8fa3', genres: ['ballad','singer-songwriter','acoustic','soft','adult contemporary','easy listening','lounge'] },
   { id: 'edm',    name: 'EDM / Electronic', color: '#00ff88', genres: ['edm','electronic','dance','house','techno','trance','dubstep','drum and bass','dnb','electro','synthwave','hyperpop','future bass','lo-fi','ambient electronic','disco','funk'] },
   { id: 'misc',   name: 'Misc',             color: '#888888', genres: [] },
 ];
+
+// ─── ARTIST OVERRIDES ─────────────────────────────────────────────────────
+// Simple string fragments — if any artist on a track contains one of these, assign that bucket
+// These catch artists with weak or missing Spotify genre data
+const ARTIST_OVERRIDES = {
+  rap: ['khaled','lil baby','dababy','da baby','polo g','roddy ricch','gunna','youngboy','nba young','juice wrld','xxxtenta','playboi','uzi vert','21 savage','offset','metro boomin','cardi b','megan thee','nicki minaj','big sean','meek mill','a$ap','asap rocky','wiz khalifa','snoop dogg','eminem','kendrick','travis scott','drake','future','young thug','young jeezy','chance the rapper','mac miller','childish gambino','tyler the creator','frank ocean','j cole','logic','big k.r.i.t','schoolboy q','ab-soul','joey bada','flatbush','denzel curry','earthgang','dreamville','freddie gibbs','vince staples','kojey radical','digga d'],
+  rnb: ['ciara','usher','alicia keys','john legend','neyo','ne-yo','trey songz','jeremih','partynextdoor','bryson tiller','h.e.r','ella mai','summer walker','brent faiyaz','giveon','jazmine sullivan','ari lennox','kehlani','jhene aiko','doja cat','normani','tinashe','mahalia','jorja smith','daniel caesar','sza','the weeknd','frank ocean','khalid','bebe rexha','zara larsson'],
+  pop: ['post malone','justin bieber','shawn mendes','harry styles','one direction','sam smith','charlie puth','ed sheeran','adele','taylor swift','ariana grande','billie eilish','olivia rodrigo','dua lipa','selena gomez','katy perry','lady gaga','charli xcx','sabrina carpenter','lorde','lana del rey','halsey','melanie martinez','elton john','mariah carey','whitney houston','michael jackson','janet jackson','madonna','britney spears','christina aguilera','rihanna','beyonce','lizzo','sia','camila cabello','hailee steinfeld','bebe rexha','anne-marie'],
+  edm: ['david guetta','calvin harris','martin garrix','tiesto','deadmau5','skrillex','diplo','zedd','marshmello','chainsmokers','illenium','kygo','porter robinson','madeon','disclosure','flume','avicii','swedish house','hardwell','afrojack','alok','fisher','dom dolla','fred again'],
+  rock: ['green day','blink','linkin park','paramore','my chemical romance','mcr','fall out boy','twenty one pilots','panic at the disco','imagine dragons','nickelback','foo fighters','slipknot','avenged sevenfold','bmth','bring me the horizon','a day to remember','sleeping with sirens','pierce the veil','falling in reverse','the used','system of a down','tool','metallica','ac/dc','acdc','red hot chili peppers','rhcp','nirvana','pearl jam','soundgarden'],
+  afro: ['wizkid','wiz kid','burna boy','davido','tems','ckay','rema','omah lay','fireboy','asake','kizz daniel','yemi alade','tiwa savage','mr eazi','olamide','naira marley','zlatan','patoranking','tekno','adekunle gold','afrobeats','amapiano','bad boy timz','joeboy','oxlade','victony','ruger','ayra starr','benson boone'],
+  game: ['john williams','hans zimmer','howard shore','ennio morricone','danny elfman','joe hisaishi','yoko shimomura','nobuo uematsu','koji kondo','yasunori mitsuda','bear mccreary','ramin djawadi','alexandre desplat','ludwig goransson','michael giacchino'],
+  ballad: ['adele','sam smith','james arthur','lewis capaldi','tom odell','passenger','ben platt','josh groban','andrea bocelli','celine dion','james blunt'],
+};
+
+// Fast lookup: normalize artist name and check all override lists
+function getArtistOverride(artistString) {
+  const parts = artistString.toLowerCase().split(',').map(s => s.trim());
+  for (const [bucket, fragments] of Object.entries(ARTIST_OVERRIDES)) {
+    for (const part of parts) {
+      for (const frag of fragments) {
+        if (part.includes(frag) || frag.includes(part)) {
+          return bucket;
+        }
+      }
+    }
+  }
+  return null;
+}
 
 // ─── STATE ────────────────────────────────────────────────────────────────
 let accessToken = null;
@@ -1028,55 +1052,36 @@ function startAuth() {
   const clientId = document.getElementById('client-id').value.trim();
   const secret = document.getElementById('client-secret').value.trim();
   if (!clientId || !secret) { showToast('Enter both Client ID and Secret', 'error'); return; }
-
   sessionStorage.setItem('spotify_client_id', clientId);
   sessionStorage.setItem('spotify_client_secret', secret);
   const anthropicKey = document.getElementById('anthropic-key').value.trim();
   if (anthropicKey) sessionStorage.setItem('anthropic_key', anthropicKey);
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    response_type: 'code',
-    redirect_uri: REDIRECT_URI,
-    scope: SCOPES,
-    show_dialog: true
-  });
-  window.location = `https://accounts.spotify.com/authorize?${params}`;
+  const params = new URLSearchParams({ client_id: clientId, response_type: 'code', redirect_uri: REDIRECT_URI, scope: SCOPES, show_dialog: true });
+  window.location = 'https://accounts.spotify.com/authorize?' + params;
 }
 
 async function handleCallback(code) {
   const clientId = sessionStorage.getItem('spotify_client_id');
   const secret = sessionStorage.getItem('spotify_client_secret');
-
   const res = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Authorization': 'Basic ' + btoa(clientId + ':' + secret)
-    },
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'Basic ' + btoa(clientId + ':' + secret) },
     body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI })
   });
-
   const data = await res.json();
   if (data.error) { showToast('Auth failed: ' + data.error_description, 'error'); return; }
   accessToken = data.access_token;
-
-  // Clean URL
   window.history.replaceState({}, '', window.location.pathname);
-
   showApp();
 }
 
 async function showApp() {
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
-
-  // Get user info
   try {
     const me = await spotifyGet('/me');
-    document.getElementById('user-info').innerHTML = `${me.display_name}<br><span style="font-size:10px;">${me.email || ''}</span>`;
+    document.getElementById('user-info').innerHTML = me.display_name + '<br><span style="font-size:10px;">' + (me.email || '') + '</span>';
   } catch(e) {}
-
   renderBucketNav();
   showView('loading');
   await fetchPlaylist();
@@ -1087,7 +1092,7 @@ async function spotifyGet(path, params = {}) {
   const url = new URL('https://api.spotify.com/v1' + path);
   Object.entries(params).forEach(([k,v]) => url.searchParams.set(k, v));
   const res = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
-  if (!res.ok) throw new Error(`Spotify ${res.status}: ${path}`);
+  if (!res.ok) throw new Error('Spotify ' + res.status + ': ' + path);
   return res.json();
 }
 
@@ -1100,31 +1105,27 @@ async function spotifyPost(path, body) {
   return res.json();
 }
 
-// ─── FETCH PLAYLIST ────────────────────────────────────────────────────────
+// ─── MAIN PIPELINE ─────────────────────────────────────────────────────────
 async function fetchPlaylist() {
   showView('loading');
   allSongs = [];
   log('Fetching your playlists...', 'current');
 
   try {
-    // Get all user playlists, pick the largest one
+    // Step 1 — Get all playlists, pick largest
     let playlists = [];
     let url = '/me/playlists';
     while (url) {
       const data = await spotifyGet(url.replace('https://api.spotify.com/v1',''), { limit: 50 });
-      playlists = playlists.concat(data.items);
+      playlists = playlists.concat(data.items.filter(Boolean));
       url = data.next ? data.next.replace('https://api.spotify.com/v1','') : null;
     }
-
-    log(`Found ${playlists.length} playlists`, 'done');
-
-    // Pick largest
     playlists.sort((a,b) => b.tracks.total - a.tracks.total);
     const main = playlists[0];
-    log(`Using "${main.name}" (${main.tracks.total} tracks)`, 'current');
+    log('Using "' + main.name + '" (' + main.tracks.total + ' tracks)', 'current');
 
-    // Fetch all tracks
-    let tracksUrl = `/playlists/${main.id}/tracks`;
+    // Step 2 — Fetch all tracks
+    let tracksUrl = '/playlists/' + main.id + '/tracks';
     let fetched = 0;
     while (tracksUrl) {
       const data = await spotifyGet(tracksUrl, { limit: 100, fields: 'next,items(track(id,name,artists,album(release_date)))' });
@@ -1133,125 +1134,111 @@ async function fetchPlaylist() {
         id: i.track.id,
         title: i.track.name,
         artist: i.track.artists.map(a => a.name).join(', '),
-        artistId: i.track.artists[0]?.id,
         allArtistIds: i.track.artists.map(a => a.id).filter(Boolean),
         year: (i.track.album.release_date || '0000').substring(0, 4),
-        bucket: null,
+        bucket: 'misc',
         genres: []
       })));
       fetched += valid.length;
-      log(`Fetched ${fetched}/${main.tracks.total} tracks...`, 'current');
+      log('Fetched ' + fetched + '/' + main.tracks.total + ' tracks...', 'current');
       tracksUrl = data.next ? data.next.replace('https://api.spotify.com/v1','') : null;
     }
+    log('Fetched all ' + allSongs.length + ' tracks', 'done');
 
-    log(`Fetched all ${allSongs.length} tracks`, 'done');
-    log('Fetching artist genre data...', 'current');
-
-    // Batch artist genre fetch
-    const artistIds = [...new Set(allSongs.flatMap(s => s.allArtistIds || [s.artistId]).filter(Boolean))];
-    const artistGenres = {};
-    for (let i = 0; i < artistIds.length; i += 50) {
-      const batch = artistIds.slice(i, i + 50);
-      const data = await spotifyGet('/artists', { ids: batch.join(',') });
-      data.artists.forEach(a => { if (a) artistGenres[a.id] = a.genres || []; });
-      log(`Artist genres: ${Math.min(i+50, artistIds.length)}/${artistIds.length}`, 'current');
-    }
-
-    // Attach genres and first-pass categorize
-    log('Categorizing songs...', 'current');
-    allSongs.forEach(s => {
-      // Combine genres from all artists on the track
-      const allGenres = (s.allArtistIds || [s.artistId])
-        .flatMap(id => artistGenres[id] || []);
-      s.genres = [...new Set(allGenres)];
-      s.bucket = categorizeSong(s);
-    });
-
-    // ── PASS 2: Audio Features ──
-    let miscSongs = allSongs.filter(s => s.bucket === 'misc');
-    log(`${miscSongs.length} uncategorized — running audio features pass...`, 'current');
-
-    const miscIds = miscSongs.map(s => s.id);
-    const audioFeatures = {};
-    for (let i = 0; i < miscIds.length; i += 100) {
-      const batch = miscIds.slice(i, i + 100);
+    // Step 3 — Fetch Spotify genre data for ALL unique artists
+    const allArtistIds = [...new Set(allSongs.flatMap(s => s.allArtistIds))];
+    const artistGenreMap = {};
+    log('Fetching Spotify genres for ' + allArtistIds.length + ' artists...', 'current');
+    for (let i = 0; i < allArtistIds.length; i += 50) {
+      const batch = allArtistIds.slice(i, i + 50);
       try {
-        const data = await spotifyGet('/audio-features', { ids: batch.join(',') });
-        (data.audio_features || []).forEach(f => { if (f) audioFeatures[f.id] = f; });
+        const data = await spotifyGet('/artists', { ids: batch.join(',') });
+        data.artists.forEach(a => { if (a) artistGenreMap[a.id] = a.genres || []; });
       } catch(e) {}
-      log(`Audio features: ${Math.min(i+100, miscIds.length)}/${miscIds.length}`, 'current');
+      if (i % 500 === 0) log('Spotify genres: ' + Math.min(i+50, allArtistIds.length) + '/' + allArtistIds.length, 'current');
     }
 
-    miscSongs.forEach(s => {
-      const af = audioFeatures[s.id];
-      const result = categorizeByAudioFeatures(s, af);
-      if (result !== 'misc') s.bucket = result;
+    // Step 4 — Pass 1: Categorize using Spotify genres + artist overrides
+    log('Pass 1 — Spotify genres + artist overrides...', 'current');
+    let pass1Count = 0;
+    allSongs.forEach(s => {
+      // Merge genres from ALL artists on the track
+      s.genres = [...new Set(s.allArtistIds.flatMap(id => artistGenreMap[id] || []))];
+      
+      // Try artist override first (catches artists with no Spotify genre data)
+      const override = getArtistOverride(s.artist);
+      if (override) {
+        s.bucket = override;
+        pass1Count++;
+        return;
+      }
+
+      // Score based on Spotify genres
+      const bucket = categorizeSong(s);
+      if (bucket !== 'misc') pass1Count++;
+      s.bucket = bucket;
     });
+    const afterPass1 = allSongs.filter(s => s.bucket === 'misc').length;
+    log('Pass 1 complete — ' + pass1Count + ' tagged, ' + afterPass1 + ' remaining', 'done');
 
-    let stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
-    log(`Audio features pass — ${miscSongs.length - stillMisc} rescued, ${stillMisc} remaining`, 'done');
-
-    // ── PASS 3: Last.fm ──
-    miscSongs = allSongs.filter(s => s.bucket === 'misc');
+    // Step 5 — Pass 2: Last.fm for remaining misc
+    const miscSongs = allSongs.filter(s => s.bucket === 'misc');
     if (LASTFM_KEY && miscSongs.length > 0) {
-      // Deduplicate — one fetch per unique artist
-      const artistSongMap = {};
+      // Build a map of unique artist name → one representative song
+      // Key: normalized artist name. We check ALL artists on a track separately.
+      const uniqueArtists = new Map();
       miscSongs.forEach(s => {
         s.artist.split(',').forEach(a => {
           const key = a.trim().toLowerCase();
-          if (!artistSongMap[key]) artistSongMap[key] = { artist: a.trim(), title: s.title };
+          if (!uniqueArtists.has(key)) {
+            uniqueArtists.set(key, a.trim());
+          }
         });
       });
-      const uniqueEntries = Object.entries(artistSongMap);
-      console.log('LASTFM START miscSongs:', miscSongs.length, 'uniqueArtists:', uniqueEntries.length);
-      console.log('KHALED in miscSongs:', miscSongs.filter(s => s.artist.toLowerCase().includes('khaled')).map(s => s.title + ' | ' + s.bucket));
-      log(`Last.fm pass — ${uniqueEntries.length} unique artists (${miscSongs.length} songs)...`, 'current');
 
-      const lfmCache = {};
-      const LFM_BATCH = 5;
-      for (let i = 0; i < uniqueEntries.length; i += LFM_BATCH) {
-        const batch = uniqueEntries.slice(i, i + LFM_BATCH);
-        await Promise.all(batch.map(async ([artistKey, s]) => {
-          const tags = await fetchLastFmTags(s.artist, s.title);
-          lfmCache[artistKey] = tags;
-          if (artistKey.includes('khaled')) {
-            console.log('DEBUG FETCH "' + artistKey + '" →', tags.slice(0,5));
-          }
+      log('Pass 2 — Last.fm for ' + uniqueArtists.size + ' unique artists (' + miscSongs.length + ' songs)...', 'current');
+
+      // Fetch tags for every unique artist, store in cache by normalized name
+      const tagCache = new Map(); // key: normalized artist name → tags array
+      const artistEntries = [...uniqueArtists.entries()]; // [[key, originalName], ...]
+      const BATCH = 8;
+
+      for (let i = 0; i < artistEntries.length; i += BATCH) {
+        const batch = artistEntries.slice(i, i + BATCH);
+        await Promise.all(batch.map(async ([key, name]) => {
+          const tags = await fetchLastFmArtistTags(name);
+          tagCache.set(key, tags);
         }));
-        if (i % 50 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueEntries.length)}/${uniqueEntries.length} artists...`, 'current');
-        await sleep(150);
+        if (i % 80 === 0) log('Last.fm: ' + Math.min(i + BATCH, artistEntries.length) + '/' + artistEntries.length + ' artists...', 'current');
+        await sleep(120);
       }
 
-      let lfmRescued = 0;
-      // Debug — how many Khaled songs are in miscSongs at apply time?
-      const khaledInMisc = miscSongs.filter(s => s.artist.toLowerCase().includes('khaled'));
-      console.log('DEBUG Khaled in misc at apply:', khaledInMisc.length, khaledInMisc.map(s => s.title).slice(0,3));
+      // Apply: for each misc song, combine tags from ALL its artists and categorize
+      let pass2Count = 0;
       miscSongs.forEach(s => {
-        // Combine tags from ALL artists on the track
-        const allTags = [...new Set(
-          s.artist.split(',').flatMap(a => lfmCache[a.trim().toLowerCase()] || [])
-        )];
-        // Debug apply step for DJ Khaled
-        if (s.artist.toLowerCase().includes('khaled')) {
-          const key0 = s.artist.split(',')[0].trim().toLowerCase();
-          const cachedTags = lfmCache[key0] || [];
-          console.log('DEBUG APPLY:', JSON.stringify({artist: s.artist, key: key0, cached: cachedTags.length, combined: allTags.length, tags: allTags.slice(0,5), result: categorizeByTags(allTags)}));
-        }
-        if (allTags.length > 0) {
-          const bucket = categorizeByTags(allTags);
-          if (bucket !== 'misc') { s.bucket = bucket; lfmRescued++; }
+        const combinedTags = [];
+        s.artist.split(',').forEach(a => {
+          const key = a.trim().toLowerCase();
+          const tags = tagCache.get(key) || [];
+          tags.forEach(t => { if (!combinedTags.includes(t)) combinedTags.push(t); });
+        });
+
+        if (combinedTags.length > 0) {
+          const bucket = categorizeByTags(combinedTags);
+          if (bucket !== 'misc') {
+            s.bucket = bucket;
+            pass2Count++;
+          }
         }
       });
 
-      stillMisc = allSongs.filter(s => s.bucket === 'misc').length;
-      log(`Last.fm pass — ${lfmRescued} rescued, ${stillMisc} remaining`, 'done');
-    } else if (!LASTFM_KEY) {
-      log('No Last.fm key — skipping', '');
+      const afterPass2 = allSongs.filter(s => s.bucket === 'misc').length;
+      log('Pass 2 complete — ' + pass2Count + ' tagged, ' + afterPass2 + ' remaining', 'done');
     }
 
-    const totalMisc = allSongs.filter(s => s.bucket === 'misc').length;
-    const pct = ((totalMisc / allSongs.length) * 100).toFixed(1);
-    log(`All passes complete — ${totalMisc} songs in Misc (${pct}%)`, 'done');
+    const finalMisc = allSongs.filter(s => s.bucket === 'misc').length;
+    const pct = ((finalMisc / allSongs.length) * 100).toFixed(1);
+    log('All passes complete — ' + finalMisc + ' in Misc (' + pct + '%)', 'done');
     log('Building review interface...', 'current');
 
     updateStats();
@@ -1266,68 +1253,114 @@ async function fetchPlaylist() {
   }
 }
 
-// ─── HELPERS ──────────────────────────────────────────────────────────────────
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// ─── CATEGORIZATION: SPOTIFY GENRES ───────────────────────────────────────
+function categorizeSong(song) {
+  const genres = song.genres.map(g => g.toLowerCase());
+  if (genres.length === 0) return 'misc';
 
-async function fetchLastFmTags(artistName, trackName) {
-  if (!LASTFM_KEY) return [];
-  try {
-    // Try each artist in the comma-separated list until we get tags
-    const artists = artistName.split(',').map(a => a.trim());
-    let allTags = [];
-    for (const artist of artists) {
-      const url = `https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=${encodeURIComponent(artist)}&api_key=${LASTFM_KEY}&format=json&autocorrect=1`;
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data.error) continue;
-      const tags = (data.toptags?.tag || []).map(t => t.name.toLowerCase());
-      allTags = [...new Set([...allTags, ...tags])];
-      if (allTags.length > 5) break; // enough tags, stop fetching
-    }
-    return allTags;
-  } catch(e) { return []; }
+  const g = genres.join(' ');
+
+  // Script detection — most reliable
+  if (/[぀-ヿ㐀-䶿一-鿿]/.test(song.artist + song.title)) return 'jmusic';
+  if (/[가-힯ᄀ-ᇿ]/.test(song.artist + song.title)) return 'kpop';
+
+  // Score each bucket
+  const scores = {};
+  BUCKETS.filter(b => b.id !== 'misc').forEach(b => {
+    scores[b.id] = 0;
+    b.genres.forEach(keyword => {
+      if (genres.some(sg => sg.includes(keyword) || keyword.includes(sg))) {
+        scores[b.id] += 2;
+      }
+    });
+  });
+
+  // Extra boosts for ambiguous genres
+  if (/hip.?hop|rap|trap|drill|grime|boom.?bap/.test(g)) scores.rap += 4;
+  if (/r.?b|rnb|soul|urban|motown|new.?jack/.test(g)) scores.rnb += 4;
+  if (/afro|amapiano|highlife|naija|nigerian/.test(g)) scores.afro += 6;
+  if (/k.pop|kpop|korean/.test(g)) scores.kpop += 6;
+  if (/j.pop|jpop|anime|vocaloid|japanese/.test(g)) scores.jmusic += 6;
+  if (/edm|electronic|house|techno|trance|dubstep|synthwave|hyperpop/.test(g)) scores.edm += 3;
+  if (/metal|punk|screamo|hardcore|grunge|thrash/.test(g)) scores.rock += 4;
+  if (/ballad|acoustic|singer.songwriter|folk|country|easy.listening/.test(g)) scores.ballad += 4;
+  if (/pop/.test(g) && !/hip|rap|rock|metal|edm|electronic/.test(g)) scores.pop += 3;
+
+  // Priority order for tiebreaking
+  const priority = ['jmusic','kpop','afro','game','ballad','rnb','rap','rock','edm','pop'];
+  const maxScore = Math.max(...Object.values(scores));
+  if (maxScore === 0) return 'misc';
+  for (const p of priority) {
+    if (scores[p] === maxScore) return p;
+  }
+  return 'misc';
 }
 
+// ─── CATEGORIZATION: LASTFM TAGS ──────────────────────────────────────────
 function categorizeByTags(tags) {
-  const t = ' ' + tags.join(' ') + ' ';
+  // Check each tag individually — more flexible than joined string regex
+  const has = (...keywords) => keywords.some(kw => tags.some(t => t.includes(kw)));
 
-  // Most specific first — cultural/regional genres override generic ones
-  if (/afrobeats|afropop|afroswing|amapiano|afrobeat|highlife|afro pop|afro house|naija|nigerian pop|afrofusion/.test(t)) return 'afro';
-  if (/k.pop|kpop|korean pop|korean r.b|korean hip hop|k.indie|k.rap/.test(t)) return 'kpop';
-  if (/j.pop|jpop|j.rock|jrock|vocaloid|anime|japanese pop|japanese rock|city pop|shibuya|visual kei/.test(t)) return 'jmusic';
+  // Cultural/regional — highest priority
+  if (has('afrobeat','afropop','afroswing','amapiano','highlife','naija','afrofusion','nigerian','ghanaian','west african')) return 'afro';
+  if (has('k-pop','kpop','k pop','korean','k-indie','hallyu')) return 'kpop';
+  if (has('j-pop','jpop','j pop','j-rock','jrock','vocaloid','anime','japanese','city pop','visual kei')) return 'jmusic';
 
-  // OST / instrumental
-  if (/video game|game music|chiptune|game ost|video game music|nintendo|playstation/.test(t)) return 'game';
-  if (/film score|movie soundtrack|musical theatre|broadway|television music|cinematic|orchestral/.test(t)) return 'game';
-  if (/ ost |original soundtrack|anime ost/.test(t)) return 'game';
+  // OST
+  if (has('video game','game music','chiptune','nintendo','playstation','rpg','game ost')) return 'game';
+  if (has('film score','soundtrack','musical','broadway','cinematic','orchestral','classical')) return 'game';
 
-  // Rap — check before r&b since trap overlaps
-  if (/hip.?hop|rap|trap|drill|grime|boom bap|mumble rap|gangsta|melodic rap/.test(t)) return 'rap';
+  // Rap — very broad
+  if (has('hip-hop','hip hop','hiphop','rap','trap','drill','grime','boom bap','gangsta','cloud rap','phonk','crunk','dirty south','southern rap','east coast','west coast')) return 'rap';
 
-  // R&B and soul
-  if (/r&b|rnb|neo soul|soul|urban contemporary|rhythm and blues|new jack swing|motown|quiet storm/.test(t)) return 'rnb';
+  // R&B
+  if (has('r&b','rnb','rhythm and blues','neo soul','soul','urban','motown','quiet storm','new jack','contemporary r')) return 'rnb';
 
-  // Rock — metal/punk first, then broader rock
-  if (/metal|punk|screamo|hardcore|post-hardcore|metalcore|emo|grunge|death metal|black metal|thrash/.test(t)) return 'rock';
-  if (/rock|alternative rock|indie rock|classic rock|hard rock|pop punk|garage rock|psychedelic rock/.test(t)) return 'rock';
+  // Rock
+  if (has('metal','punk','screamo','hardcore','metalcore','grunge','thrash','emo','deathcore')) return 'rock';
+  if (has('rock','alternative','indie rock','classic rock','hard rock','pop punk','shoegaze','post-rock')) return 'rock';
 
-  // EDM / electronic
-  if (/edm|electronic dance|house|techno|trance|dubstep|drum and bass|dnb|synthwave|hyperpop|future bass|lo.fi|ambient electronic|club music/.test(t)) return 'edm';
+  // EDM
+  if (has('edm','electronic','house','techno','trance','dubstep','drum and bass','dnb','synthwave','hyperpop','future bass','lo-fi','lofi','ambient','club','dance','electro','breakbeat','bass music')) return 'edm';
 
-  // Ballad / soft
-  if (/ballad|singer.songwriter|acoustic|easy listening|adult contemporary|soft rock|folk|country/.test(t)) return 'ballad';
+  // Ballad
+  if (has('ballad','singer-songwriter','singer songwriter','acoustic','easy listening','adult contemporary','folk','country','americana','piano','unplugged','soft rock')) return 'ballad';
 
-  // Pop last — broad catch
-  if (/pop|dance pop|indie pop|synth.pop|electropop|teen pop|art pop/.test(t)) return 'pop';
+  // Pop
+  if (has('pop','indie pop','synth pop','electropop','teen pop','art pop','bubblegum','power pop')) return 'pop';
+
+  // Mood/vibe fallbacks — only if tags exist but nothing matched
+  if (tags.length > 0) {
+    if (has('mellow','slow jam','smooth','quiet storm','chill')) return 'rnb';
+    if (has('party','workout','energetic','hype','banger','club music')) return 'edm';
+    if (has('sad','melancholy','emotional','heartbreak','piano','acoustic guitar')) return 'ballad';
+    if (has('female vocalist','male vocalist','singer','vocalist','00s','90s','80s','70s','60s')) return 'pop';
+  }
 
   return 'misc';
 }
+
+// ─── LASTFM FETCH ─────────────────────────────────────────────────────────
+async function fetchLastFmArtistTags(artistName) {
+  if (!LASTFM_KEY) return [];
+  try {
+    const url = 'https://ws.audioscrobbler.com/2.0/?method=artist.gettoptags&artist=' + encodeURIComponent(artistName) + '&api_key=' + LASTFM_KEY + '&format=json&autocorrect=1';
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data.error) return [];
+    return (data.toptags && data.toptags.tag ? data.toptags.tag : []).map(t => t.name.toLowerCase());
+  } catch(e) { return []; }
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // ─── EMERGENCY CLAUDE PASS ────────────────────────────────────────────────
 async function emergencyClaudePass() {
   const miscSongs = allSongs.filter(s => s.bucket === 'misc');
   if (miscSongs.length === 0) { showToast('No misc songs to sort!', 'success'); return; }
+  const anthropicKey = sessionStorage.getItem('anthropic_key') || '';
+  if (!anthropicKey) { showToast('No Anthropic API key — add it on the login screen', 'error'); return; }
 
   const btn = document.getElementById('btn-emergency');
   btn.disabled = true;
@@ -1336,198 +1369,44 @@ async function emergencyClaudePass() {
 
   const BATCH = 40;
   let rescued = 0;
-  const bucketNames = ['rock','jmusic','kpop','game','rap','rnb','pop','ballad','edm','afro','misc'];
+  const validBuckets = ['rock','jmusic','kpop','game','rap','rnb','pop','ballad','edm','afro','misc'];
 
   for (let i = 0; i < miscSongs.length; i += BATCH) {
     const batch = miscSongs.slice(i, i + BATCH);
     const songList = batch.map((s, idx) => (idx + 1) + '. "' + s.title + '" by ' + s.artist + ' (' + s.year + ')').join('\n');
-
     try {
-      const anthropicKey = sessionStorage.getItem('anthropic_key') || '';
-      if (!anthropicKey) { showToast('No Anthropic API key — add it on the login screen', 'error'); break; }
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6-20251101',
           max_tokens: 1000,
-          system: `You are a music categorization expert. Categorize each song into exactly one of these buckets:
-- rock: rock, punk, metal, screamo, emo, alternative, hardcore, grunge, pop punk
-- jmusic: J-pop, J-rock, anime OSTs, Vocaloid, any Japanese music
-- kpop: K-pop, K-R&B, K-indie, any Korean music
-- game: video game OSTs, film scores, TV soundtracks, musical theatre
-- rap: hip-hop, rap, trap, drill, grime
-- rnb: R&B, soul, neo soul, urban contemporary
-- pop: mainstream pop, indie pop, synth-pop, dance pop
-- ballad: slow emotional songs, singer-songwriter, acoustic, adult contemporary
-- edm: EDM, electronic dance, house, techno, trance, dubstep, synthwave, hyperpop
-- afro: Afrobeats, Afropop, Afroswing, Amapiano, Nigerian pop, West African music
-- misc: truly unclassifiable
-
-Respond ONLY with a JSON array of bucket IDs in the same order as the songs. Example: ["pop","rap","rock"]
-No explanation, no markdown, just the raw JSON array.`,
+          system: 'You are a music genre expert. Categorize each song into exactly one bucket: rock, jmusic (Japanese), kpop (Korean), game (OST/soundtrack), rap, rnb, pop, ballad, edm, afro (Afrobeats), misc. Respond ONLY with a JSON array of bucket IDs matching the order of songs. No markdown, no explanation.',
           messages: [{ role: 'user', content: 'Categorize these songs:\n' + songList }]
         })
       });
-
       const data = await res.json();
-      const text = data.content?.[0]?.text?.trim() || '[]';
-      const clean = text.replace(/```json|```/g, '').trim();
-      const results = JSON.parse(clean);
-
+      const text = (data.content && data.content[0] ? data.content[0].text : '[]').trim().replace(/```json|```/g, '');
+      const results = JSON.parse(text);
       results.forEach((bucketId, idx) => {
-        if (batch[idx] && bucketNames.includes(bucketId) && bucketId !== 'misc') {
+        if (batch[idx] && validBuckets.includes(bucketId) && bucketId !== 'misc') {
           batch[idx].bucket = bucketId;
           rescued++;
         }
       });
-
-      showToast(`Claude sorted batch ${Math.floor(i/BATCH)+1} — ${rescued} rescued so far`, 'success');
+      showToast('Batch ' + (Math.floor(i/BATCH)+1) + ' done — ' + rescued + ' rescued', 'success');
     } catch(e) {
-      showToast(`Batch ${Math.floor(i/BATCH)+1} failed: ${e.message}`, 'error');
+      showToast('Batch ' + (Math.floor(i/BATCH)+1) + ' failed', 'error');
     }
-
-    await sleep(500);
+    await sleep(400);
   }
-
-  const remaining = allSongs.filter(s => s.bucket === 'misc').length;
-  const pct = ((remaining / allSongs.length) * 100).toFixed(1);
 
   btn.disabled = false;
   btn.classList.remove('running');
   btn.textContent = 'Sort this Claude';
-
-  updateStats();
-  renderBucketNav();
-  renderBucketsGrid();
-  renderTable();
-
-  showToast(`Done! ${rescued} rescued — ${remaining} still in Misc (${pct}%)`, 'success');
-}
-
-// ─── AUDIO FEATURES CATEGORIZATION ───────────────────────────────────────────
-function categorizeByAudioFeatures(song, af) {
-  const title = song.title.toLowerCase();
-  const artist = song.artist.toLowerCase();
-
-  // ── Script/character detection (most reliable signal) ──
-  // Japanese characters (hiragana, katakana, kanji)
-  if (/[぀-ヿ㐀-䶿一-鿿]/.test(song.artist + song.title)) return 'jmusic';
-  // Korean hangul
-  if (/[가-힯ᄀ-ᇿ]/.test(song.artist + song.title)) return 'kpop';
-
-  // ── No hardcoded artist names — Last.fm handles all artist lookups ──
-
-  // ── Title heuristics ──
-  if (/opening|ending|ost|theme song|main theme|insert song|bgm|soundtrack/.test(title)) return 'game';
-
-  // ── Audio features fallback ──
-  if (!af) return 'misc';
-
-  const { energy, danceability, acousticness, valence, tempo, speechiness, instrumentalness, loudness } = af;
-
-  // Pure instrumental = OST/classical
-  if (instrumentalness > 0.85 && speechiness < 0.05) return 'game';
-  if (instrumentalness > 0.6 && speechiness < 0.04 && energy < 0.6) return 'game';
-
-  // Strong rap signal — high speechiness
-  if (speechiness > 0.33) return 'rap';
-  if (speechiness > 0.18 && energy > 0.45 && danceability > 0.55) return 'rap';
-  if (speechiness > 0.12 && energy > 0.6 && danceability > 0.7 && acousticness < 0.1) return 'rap';
-
-  // Hard rock/metal — very high energy, loud, not danceable
-  if (energy > 0.88 && danceability < 0.52 && acousticness < 0.08) return 'rock';
-  if (energy > 0.8 && danceability < 0.48 && acousticness < 0.12 && loudness > -5) return 'rock';
-  if (energy > 0.75 && danceability < 0.45 && acousticness < 0.15) return 'rock';
-
-  // Hard EDM — max energy + max danceability
-  if (energy > 0.85 && danceability > 0.72 && acousticness < 0.08) return 'edm';
-  if (energy > 0.78 && danceability > 0.78 && acousticness < 0.12) return 'edm';
-  if (tempo > 128 && energy > 0.7 && danceability > 0.68 && acousticness < 0.1) return 'edm';
-
-  // Ballad — acoustic, low energy, slow
-  if (acousticness > 0.85 && energy < 0.45) return 'ballad';
-  if (acousticness > 0.7 && energy < 0.35) return 'ballad';
-  if (acousticness > 0.55 && energy < 0.28) return 'ballad';
-  if (energy < 0.22 && danceability < 0.5) return 'ballad';
-  if (energy < 0.3 && acousticness > 0.4 && tempo < 90) return 'ballad';
-
-  // Afrobeats — groove-heavy, tight tempo range, high danceability
-  if (danceability > 0.8 && energy > 0.58 && energy < 0.88 && tempo > 88 && tempo < 122 && speechiness < 0.18) return 'afro';
-  if (danceability > 0.75 && energy > 0.62 && tempo > 92 && tempo < 115 && acousticness < 0.25) return 'afro';
-
-  // R&B — moderately danceable, mid energy, smooth
-  if (danceability > 0.65 && energy > 0.38 && energy < 0.75 && acousticness < 0.4 && speechiness < 0.14 && tempo < 125) return 'rnb';
-  if (danceability > 0.58 && energy > 0.32 && energy < 0.68 && valence > 0.25 && speechiness < 0.12) return 'rnb';
-
-  // Pop — broad middle ground, catch-all for vocal melodic music
-  if (energy > 0.42 && energy < 0.86 && danceability > 0.48 && acousticness < 0.55 && speechiness < 0.14) return 'pop';
-  if (energy > 0.35 && danceability > 0.58 && acousticness < 0.45) return 'pop';
-
-  // Soft pop / slow pop
-  if (energy < 0.42 && danceability > 0.42 && acousticness < 0.6) return 'pop';
-
-  // Anything remaining low energy = ballad
-  if (energy < 0.45 && acousticness > 0.25) return 'ballad';
-  if (energy < 0.32) return 'ballad';
-
-  // Anything with decent danceability remaining = pop
-  if (danceability > 0.42) return 'pop';
-
-  return 'misc';
-}
-
-// ─── CATEGORIZATION ────────────────────────────────────────────────────────
-function categorizeSong(song) {
-  const genres = song.genres.map(g => g.toLowerCase());
-  const title = song.title.toLowerCase();
-  const artist = song.artist.toLowerCase();
-
-  // Score each bucket
-  const scores = {};
-  BUCKETS.filter(b => b.id !== 'misc').forEach(b => {
-    scores[b.id] = 0;
-    b.genres.forEach(g => {
-      if (genres.some(sg => sg.includes(g) || g.includes(sg))) scores[b.id] += 2;
-    });
-  });
-
-  // Heuristic boosts
-  if (/japanese|japan|\u65e5\u672c/.test(artist)) scores.jmusic += 5;
-  if (/korean|korea|\ud55c\uad6d/.test(artist)) scores.kpop += 5;
-  if (genres.some(g => /vocaloid|hatsune|miku|kagamine|kaito|meiko/.test(g))) scores.jmusic += 8;
-  if (genres.some(g => /k-pop|kpop/.test(g))) scores.kpop += 6;
-  if (genres.some(g => /soundtrack|ost|video game|film score|musical|broadway|television|cinematic|motion picture/.test(g))) scores.game += 6;
-
-  // Rap vs R&B separation
-  if (genres.some(g => /\bhip hop\b|\brap\b|\btrap\b|\bdrill\b|\bboom bap\b/.test(g))) scores.rap += 4;
-  if (genres.some(g => /\br&b\b|\brnb\b|\bsoul\b|\bneo soul\b|\burban contemporary\b/.test(g))) scores.rnb += 4;
-
-  // Afro boost
-  if (genres.some(g => /afrobeats|afropop|afrobeat|afroswing|amapiano|highlife|afro/.test(g))) scores.afro += 6;
-
-  // Pop boost — generic pop without rap/rock/edm
-  if (genres.some(g => /\bpop\b/.test(g)) && !genres.some(g => /rock|punk|metal|hip hop|rap|edm|electronic|dance/.test(g))) {
-    scores.pop += 3;
-  }
-
-  // Ballad detection
-  if (genres.some(g => /ballad|acoustic|singer-songwriter/.test(g)) && !genres.some(g => /rock|metal|punk|electronic|dance/.test(g))) {
-    scores.ballad += 4;
-  }
-
-  // Priority: J-Music > K-Pop > Game > Ballad > R&B > Rap > Pop > Rock > EDM
-  const priority = ['jmusic','kpop','game','ballad','rnb','rap','afro','pop','rock','edm'];
-  const maxScore = Math.max(...Object.values(scores));
-
-  if (maxScore === 0) return 'misc';
-
-  // Among tied top scorers, use priority order
-  for (const p of priority) {
-    if (scores[p] === maxScore) return p;
-  }
-
-  return 'misc';
+  updateStats(); renderBucketNav(); renderBucketsGrid(); renderTable();
+  const remaining = allSongs.filter(s => s.bucket === 'misc').length;
+  showToast('Done — ' + rescued + ' rescued, ' + remaining + ' still in Misc (' + ((remaining/allSongs.length)*100).toFixed(1) + '%)', 'success');
 }
 
 // ─── RENDER ────────────────────────────────────────────────────────────────
@@ -1535,17 +1414,15 @@ function renderBucketNav() {
   const counts = getBucketCounts();
   const nav = document.getElementById('bucket-nav');
   nav.innerHTML = '';
-
   const all = document.createElement('div');
   all.className = 'bucket-item' + (currentBucket === 'all' ? ' active' : '');
-  all.innerHTML = `<div class="bucket-dot" style="background:#fff"></div><div class="bucket-name">All Songs</div><div class="bucket-count">${allSongs.length}</div>`;
+  all.innerHTML = '<div class="bucket-dot" style="background:#fff"></div><div class="bucket-name">All Songs</div><div class="bucket-count">' + allSongs.length + '</div>';
   all.onclick = () => { currentBucket = 'all'; currentPage = 1; renderBucketNav(); renderTable(); renderBucketsGrid(); };
   nav.appendChild(all);
-
   BUCKETS.forEach(b => {
     const el = document.createElement('div');
     el.className = 'bucket-item' + (currentBucket === b.id ? ' active' : '');
-    el.innerHTML = `<div class="bucket-dot" style="background:${b.color}"></div><div class="bucket-name">${b.name}</div><div class="bucket-count">${counts[b.id] || 0}</div>`;
+    el.innerHTML = '<div class="bucket-dot" style="background:' + b.color + '"></div><div class="bucket-name">' + b.name + '</div><div class="bucket-count">' + (counts[b.id] || 0) + '</div>';
     el.onclick = () => { currentBucket = b.id; currentPage = 1; renderBucketNav(); renderTable(); renderBucketsGrid(); };
     nav.appendChild(el);
   });
@@ -1556,19 +1433,12 @@ function renderBucketsGrid() {
   const total = allSongs.length;
   const grid = document.getElementById('buckets-grid');
   grid.innerHTML = '';
-
   BUCKETS.forEach(b => {
     const count = counts[b.id] || 0;
     const pct = total ? ((count / total) * 100).toFixed(1) : 0;
     const el = document.createElement('div');
     el.className = 'bucket-card' + (currentBucket === b.id ? ' active' : '');
-    el.style.setProperty('--bc', b.color);
-    el.innerHTML = `
-      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${b.color}"></div>
-      <div class="bucket-card-name" style="color:${b.color}">${b.name}</div>
-      <div class="bucket-card-count">${count.toLocaleString()}</div>
-      <div class="bucket-card-pct">${pct}% of library</div>
-    `;
+    el.innerHTML = '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:' + b.color + '"></div><div class="bucket-card-name" style="color:' + b.color + '">' + b.name + '</div><div class="bucket-card-count">' + count.toLocaleString() + '</div><div class="bucket-card-pct">' + pct + '% of library</div>';
     el.onclick = () => { currentBucket = b.id; currentPage = 1; renderBucketNav(); renderTable(); renderBucketsGrid(); };
     grid.appendChild(el);
   });
@@ -1583,78 +1453,41 @@ function renderTable() {
     }
     return true;
   });
-
-  // Sort
   songs.sort((a, b) => {
-    const av = a[sortKey] || '';
-    const bv = b[sortKey] || '';
+    const av = a[sortKey] || ''; const bv = b[sortKey] || '';
     return av < bv ? sortDir : av > bv ? -sortDir : 0;
   });
-
-  const bucketName = currentBucket === 'all' ? 'All Songs' : BUCKETS.find(b => b.id === currentBucket)?.name;
-  document.getElementById('table-title').textContent = `${bucketName} (${songs.length.toLocaleString()})`;
-
+  const bucketName = currentBucket === 'all' ? 'All Songs' : (BUCKETS.find(b => b.id === currentBucket) || {}).name;
+  document.getElementById('table-title').textContent = bucketName + ' (' + songs.length.toLocaleString() + ')';
   const total = songs.length;
   const pages = Math.ceil(total / PAGE_SIZE);
   const start = (currentPage - 1) * PAGE_SIZE;
   const page = songs.slice(start, start + PAGE_SIZE);
-
   const tbody = document.getElementById('song-tbody');
   tbody.innerHTML = '';
-
   page.forEach(song => {
-    const b = BUCKETS.find(bk => bk.id === song.bucket) || BUCKETS[7];
+    const b = BUCKETS.find(bk => bk.id === song.bucket) || BUCKETS[BUCKETS.length - 1];
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="song-title">${escHtml(song.title)}</td>
-      <td class="song-artist">${escHtml(song.artist)}</td>
-      <td class="song-year">${song.year}</td>
-      <td><span class="bucket-tag" style="background:${b.color}22;color:${b.color}">${b.name}</span></td>
-      <td>
-        <select class="reassign-select" onchange="reassign('${song.id}', this.value)">
-          ${BUCKETS.map(bk => `<option value="${bk.id}" ${bk.id === song.bucket ? 'selected' : ''}>${bk.name}</option>`).join('')}
-        </select>
-      </td>
-    `;
+    const opts = BUCKETS.map(bk => '<option value="' + bk.id + '"' + (bk.id === song.bucket ? ' selected' : '') + '>' + bk.name + '</option>').join('');
+    tr.innerHTML = '<td class="song-title">' + escHtml(song.title) + '</td><td class="song-artist">' + escHtml(song.artist) + '</td><td class="song-year">' + song.year + '</td><td><span class="bucket-tag" style="background:' + b.color + '22;color:' + b.color + '">' + b.name + '</span></td><td><select class="reassign-select" onchange="reassign(\'' + song.id + '\', this.value)">' + opts + '</select></td>';
     tbody.appendChild(tr);
   });
-
-  // Pagination
-  const pag = document.getElementById('pagination');
-  pag.innerHTML = `
-    <button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>← Prev</button>
-    <span>Page ${currentPage} of ${pages}</span>
-    <button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage>=pages?'disabled':''}>Next →</button>
-    <span style="margin-left:8px">Showing ${start+1}–${Math.min(start+PAGE_SIZE, total)} of ${total}</span>
-  `;
+  document.getElementById('pagination').innerHTML = '<button class="page-btn" onclick="goPage(' + (currentPage-1) + ')" ' + (currentPage===1?'disabled':'') + '>← Prev</button><span>Page ' + currentPage + ' of ' + pages + '</span><button class="page-btn" onclick="goPage(' + (currentPage+1) + ')" ' + (currentPage>=pages?'disabled':'') + '>Next →</button><span style="margin-left:8px">Showing ' + (start+1) + '–' + Math.min(start+PAGE_SIZE, total) + ' of ' + total + '</span>';
 }
 
 function goPage(p) { currentPage = p; renderTable(); }
-
-function sortTable(key) {
-  if (sortKey === key) sortDir *= -1;
-  else { sortKey = key; sortDir = -1; }
-  renderTable();
-}
-
-function filterTable() {
-  searchQ = document.getElementById('search-input').value;
-  currentPage = 1;
-  renderTable();
-}
-
+function sortTable(key) { if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = -1; } renderTable(); }
+function filterTable() { searchQ = document.getElementById('search-input').value; currentPage = 1; renderTable(); }
 function reassign(id, bucketId) {
   const song = allSongs.find(s => s.id === id);
   if (song) { song.bucket = bucketId; updateStats(); renderBucketNav(); renderBucketsGrid(); renderTable(); }
 }
-
 function getBucketCounts() {
   const counts = {};
   BUCKETS.forEach(b => counts[b.id] = 0);
-  allSongs.forEach(s => { if (counts[s.bucket] !== undefined) counts[s.bucket]++; });
+  allSongs.forEach(s => { if (counts[s.bucket] !== undefined) counts[s.bucket]++; else counts['misc']++; });
   return counts;
 }
-
 function updateStats() {
   const total = allSongs.length;
   const misc = allSongs.filter(s => s.bucket === 'misc').length;
@@ -1666,157 +1499,71 @@ function updateStats() {
 // ─── CREATE PLAYLISTS ──────────────────────────────────────────────────────
 async function createPlaylists() {
   const btn = document.getElementById('btn-create');
-  btn.disabled = true;
-  btn.textContent = 'Creating...';
-
+  btn.disabled = true; btn.textContent = 'Creating...';
   try {
     const me = await spotifyGet('/me');
-    const userId = me.id;
     const results = [];
-
     for (const bucket of BUCKETS) {
       const songs = allSongs.filter(s => s.bucket === bucket.id);
       if (songs.length === 0) continue;
-
-      // Sort newest → oldest
       songs.sort((a, b) => b.year.localeCompare(a.year));
-
-      // Create playlist
-      const pl = await spotifyPost(`/users/${userId}/playlists`, {
-        name: `SORTD — ${bucket.name}`,
-        public: false,
-        description: `Auto-sorted by SORTD • ${songs.length} tracks`
-      });
-
-      // Add tracks in batches of 100
-      const ids = songs.map(s => `spotify:track:${s.id}`);
-      for (let i = 0; i < ids.length; i += 100) {
-        await spotifyPost(`/playlists/${pl.id}/tracks`, { uris: ids.slice(i, i+100) });
-      }
-
+      const pl = await spotifyPost('/users/' + me.id + '/playlists', { name: 'SORTD — ' + bucket.name, public: false, description: 'Auto-sorted by SORTD • ' + songs.length + ' tracks' });
+      const ids = songs.map(s => 'spotify:track:' + s.id);
+      for (let i = 0; i < ids.length; i += 100) await spotifyPost('/playlists/' + pl.id + '/tracks', { uris: ids.slice(i, i+100) });
       results.push({ name: bucket.name, count: songs.length, color: bucket.color });
-      showToast(`Created: ${bucket.name}`, 'success');
+      showToast('Created: ' + bucket.name, 'success');
     }
-
-    // Show success
-    const list = document.getElementById('created-list');
-    list.innerHTML = results.map(r => `
-      <div class="created-item">
-        <div class="created-item-name">
-          <div style="width:8px;height:8px;border-radius:50%;background:${r.color}"></div>
-          SORTD — ${r.name}
-        </div>
-        <div style="color:var(--muted);font-size:11px">${r.count.toLocaleString()} tracks</div>
-      </div>
-    `).join('');
-
+    document.getElementById('created-list').innerHTML = results.map(r => '<div class="created-item"><div class="created-item-name"><div style="width:8px;height:8px;border-radius:50%;background:' + r.color + '"></div>SORTD — ' + r.name + '</div><div style="color:var(--muted);font-size:11px">' + r.count.toLocaleString() + ' tracks</div></div>').join('');
     document.getElementById('success-view').style.display = 'block';
     document.getElementById('overview-view').classList.add('hidden');
-
   } catch(e) {
-    showToast('Error creating playlists: ' + e.message, 'error');
-    btn.disabled = false;
-    btn.textContent = 'Create Playlists on Spotify';
+    showToast('Error: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Create All Playlists';
   }
 }
 
-// ─── EXPORT ───────────────────────────────────────────────────────────────
 function exportCSV() {
   const rows = [['Title','Artist','Year','Bucket']];
-  allSongs.forEach(s => rows.push([
-    `"${s.title.replace(/"/g,'""')}"`,
-    `"${s.artist.replace(/"/g,'""')}"`,
-    s.year,
-    BUCKETS.find(b => b.id === s.bucket)?.name || 'Misc'
-  ]));
+  allSongs.forEach(s => rows.push(['"' + s.title.replace(/"/g,'""') + '"', '"' + s.artist.replace(/"/g,'""') + '"', s.year, (BUCKETS.find(b => b.id === s.bucket) || {}).name || 'Misc']));
   const blob = new Blob([rows.map(r => r.join(',')).join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'sortd-playlist.csv';
-  a.click();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sortd-playlist.csv'; a.click();
 }
 
-// ─── UTILS ────────────────────────────────────────────────────────────────
-function showView(v) {
-  document.getElementById('loading-view').classList.toggle('hidden', v !== 'loading');
-  document.getElementById('overview-view').classList.toggle('hidden', v !== 'overview');
-}
-
-function log(msg, type = '') {
-  const el = document.getElementById('loading-log');
-  const line = document.createElement('div');
-  line.className = 'log-line ' + type;
-  line.textContent = '› ' + msg;
-  el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
-}
-
-function showToast(msg, type = '') {
-  const t = document.createElement('div');
-  t.className = 'toast ' + type;
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
-}
-
-function escHtml(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ─── MODAL HELPERS ────────────────────────────────────────────────────────────
+// ─── MODAL HELPERS ─────────────────────────────────────────────────────────
 function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
 function openCreateModal() {
   const b = BUCKETS.find(bk => bk.id === currentBucket);
   const songs = currentBucket === 'all' ? allSongs : allSongs.filter(s => s.bucket === currentBucket);
-  const name = b ? `SORTD — ${b.name}` : 'SORTD — My Playlist';
-  document.getElementById('pl-name').value = name;
+  document.getElementById('pl-name').value = b ? 'SORTD — ' + b.name : 'SORTD — My Playlist';
   document.getElementById('pl-desc').value = '';
-  document.getElementById('create-modal-sub').textContent = `${songs.length.toLocaleString()} songs from ${b ? b.name : 'All'}`;
+  document.getElementById('create-modal-sub').textContent = songs.length.toLocaleString() + ' songs from ' + (b ? b.name : 'All');
   document.getElementById('create-modal').classList.remove('hidden');
 }
 
-function selectSort(el) {
-  document.querySelectorAll('.sort-opt').forEach(e => e.classList.remove('selected'));
-  el.classList.add('selected');
-}
+function selectSort(el) { document.querySelectorAll('.sort-opt').forEach(e => e.classList.remove('selected')); el.classList.add('selected'); }
 
 async function confirmCreatePlaylist() {
   const name = document.getElementById('pl-name').value.trim();
   if (!name) { showToast('Enter a playlist name', 'error'); return; }
-
-  const sortKey = document.querySelector('.sort-opt.selected')?.dataset.sort || 'year-desc';
+  const sortVal = (document.querySelector('.sort-opt.selected') || {}).dataset || {};
+  const [sk, sd] = (sortVal.sort || 'year-desc').split('-');
   const isPublic = document.getElementById('pl-visibility').value === 'true';
   const desc = document.getElementById('pl-desc').value.trim();
-
   let songs = currentBucket === 'all' ? [...allSongs] : allSongs.filter(s => s.bucket === currentBucket);
-
-  // Sort
-  const [sk, sd] = sortKey.split('-');
-  songs.sort((a, b) => {
-    const av = a[sk] || ''; const bv = b[sk] || '';
-    return sd === 'desc' ? bv.localeCompare(av) : av.localeCompare(bv);
-  });
-
+  songs.sort((a, b) => { const av = a[sk]||''; const bv = b[sk]||''; return sd === 'desc' ? bv.localeCompare(av) : av.localeCompare(bv); });
   closeModal('create-modal');
   showToast('Creating playlist...', '');
-
   try {
     const me = await spotifyGet('/me');
-    const pl = await spotifyPost(`/users/${me.id}/playlists`, { name, public: isPublic, description: desc || `Sorted by SORTD • ${songs.length} tracks` });
-    const ids = songs.map(s => `spotify:track:${s.id}`);
-    for (let i = 0; i < ids.length; i += 100) {
-      await spotifyPost(`/playlists/${pl.id}/tracks`, { uris: ids.slice(i, i+100) });
-    }
-    showToast(`Created "${name}" with ${songs.length} tracks`, 'success');
-  } catch(e) {
-    showToast('Failed: ' + e.message, 'error');
-  }
+    const pl = await spotifyPost('/users/' + me.id + '/playlists', { name, public: isPublic, description: desc || 'Sorted by SORTD • ' + songs.length + ' tracks' });
+    const ids = songs.map(s => 'spotify:track:' + s.id);
+    for (let i = 0; i < ids.length; i += 100) await spotifyPost('/playlists/' + pl.id + '/tracks', { uris: ids.slice(i, i+100) });
+    showToast('Created "' + name + '" with ' + songs.length + ' tracks', 'success');
+  } catch(e) { showToast('Failed: ' + e.message, 'error'); }
 }
 
-// ─── ADD CATEGORY ─────────────────────────────────────────────────────────────
 let pendingTags = [];
-
 function openAddCatModal() {
   pendingTags = [];
   document.getElementById('cat-name').value = '';
@@ -1825,7 +1572,6 @@ function openAddCatModal() {
   document.getElementById('genre-tag-input').value = '';
   document.getElementById('addcat-modal').classList.remove('hidden');
 }
-
 function handleTagInput(e) {
   if (e.key === 'Enter' || e.key === ',') {
     e.preventDefault();
@@ -1833,59 +1579,64 @@ function handleTagInput(e) {
     if (val && !pendingTags.includes(val)) {
       pendingTags.push(val);
       const chip = document.createElement('div');
-      chip.className = 'tag-chip';
-      chip.dataset.tag = val;
-      chip.innerHTML = `${val}<button onclick="removeTag('${val}', this.parentElement)">×</button>`;
+      chip.className = 'tag-chip'; chip.dataset.tag = val;
+      chip.innerHTML = val + '<button onclick="removeTag(\'' + val + '\', this.parentElement)">×</button>';
       document.getElementById('genre-tag-wrap').insertBefore(chip, e.target);
     }
     e.target.value = '';
   }
 }
-
-function removeTag(tag, chip) {
-  pendingTags = pendingTags.filter(t => t !== tag);
-  chip.remove();
-}
-
+function removeTag(tag, chip) { pendingTags = pendingTags.filter(t => t !== tag); chip.remove(); }
 function confirmAddCategory() {
   const name = document.getElementById('cat-name').value.trim();
   const color = document.getElementById('cat-color').value;
   if (!name) { showToast('Enter a category name', 'error'); return; }
-
   const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 16);
   if (BUCKETS.find(b => b.id === id)) { showToast('Category already exists', 'error'); return; }
-
-  // Insert before misc
   const miscIdx = BUCKETS.findIndex(b => b.id === 'misc');
   BUCKETS.splice(miscIdx, 0, { id, name, color, genres: [...pendingTags] });
-
-  // Re-categorize songs that might match new category
   let rescued = 0;
   allSongs.forEach(s => {
-    const genres = s.genres.map(g => g.toLowerCase());
-    const matched = pendingTags.some(tag => genres.some(g => g.includes(tag) || tag.includes(g)));
-    if (matched && s.bucket === 'misc') { s.bucket = id; rescued++; }
+    if (s.bucket === 'misc') {
+      const matched = pendingTags.some(tag => s.genres.some(g => g.toLowerCase().includes(tag) || tag.includes(g.toLowerCase())));
+      if (matched) { s.bucket = id; rescued++; }
+    }
   });
-
   closeModal('addcat-modal');
-  updateStats();
-  renderBucketNav();
-  renderBucketsGrid();
-  renderTable();
-  showToast(`Added "${name}" — ${rescued} songs moved from Misc`, 'success');
+  updateStats(); renderBucketNav(); renderBucketsGrid(); renderTable();
+  showToast('Added "' + name + '" — ' + rescued + ' songs moved from Misc', 'success');
 }
 
-// ─── RE-SORT ──────────────────────────────────────────────────────────────────
 async function resortAll() {
-  if (!confirm('Re-run all categorization passes from scratch? This will take a few minutes.')) return;
-  allSongs.forEach(s => s.bucket = null);
+  if (!confirm('Re-run all categorization passes from scratch?')) return;
   await fetchPlaylist();
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────
+// ─── UTILS ─────────────────────────────────────────────────────────────────
+function showView(v) {
+  document.getElementById('loading-view').classList.toggle('hidden', v !== 'loading');
+  document.getElementById('overview-view').classList.toggle('hidden', v !== 'overview');
+}
+function log(msg, type) {
+  const el = document.getElementById('loading-log');
+  const line = document.createElement('div');
+  line.className = 'log-line ' + (type || '');
+  line.textContent = '› ' + msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+function showToast(msg, type) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + (type || '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+function escHtml(str) { return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
 const urlParams = new URLSearchParams(window.location.search);
 const code = urlParams.get('code');
-
 if (code && sessionStorage.getItem('spotify_client_id')) {
   document.getElementById('setup-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
