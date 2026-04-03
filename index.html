@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORTD v2.4.2 — Playlist Sorter</title>
+<title>SORTD v2.4.4 — Playlist Sorter</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1213,7 +1213,7 @@ async function fetchPlaylist() {
           const tags = await fetchLastFmTags(s.artist, s.title);
           lfmCache[artistKey] = tags;
           if (artistKey.includes('khaled')) {
-            log('DEBUG "' + artistKey + '" → ' + tags.slice(0,5).join(', '), 'current');
+            console.log('DEBUG FETCH "' + artistKey + '" →', tags.slice(0,5));
           }
         }));
         if (i % 50 === 0) log(`Last.fm: ${Math.min(i + LFM_BATCH, uniqueEntries.length)}/${uniqueEntries.length} artists...`, 'current');
@@ -1221,6 +1221,9 @@ async function fetchPlaylist() {
       }
 
       let lfmRescued = 0;
+      // Debug — how many Khaled songs are in miscSongs at apply time?
+      const khaledInMisc = miscSongs.filter(s => s.artist.toLowerCase().includes('khaled'));
+      console.log('DEBUG Khaled in misc at apply:', khaledInMisc.length, khaledInMisc.map(s => s.title).slice(0,3));
       miscSongs.forEach(s => {
         // Combine tags from ALL artists on the track
         const allTags = [...new Set(
@@ -1230,7 +1233,7 @@ async function fetchPlaylist() {
         if (s.artist.toLowerCase().includes('khaled')) {
           const key0 = s.artist.split(',')[0].trim().toLowerCase();
           const cachedTags = lfmCache[key0] || [];
-          log('DEBUG APPLY artist:"' + s.artist + '" key:"' + key0 + '" cached:' + cachedTags.length + ' combined:' + allTags.length + ' → ' + categorizeByTags(allTags), 'current');
+          console.log('DEBUG APPLY:', JSON.stringify({artist: s.artist, key: key0, cached: cachedTags.length, combined: allTags.length, tags: allTags.slice(0,5), result: categorizeByTags(allTags)}));
         }
         if (allTags.length > 0) {
           const bucket = categorizeByTags(allTags);
