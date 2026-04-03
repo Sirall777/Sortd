@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SORTD v2.4 — Playlist Sorter</title>
+<title>SORTD v2.4.1 — Playlist Sorter</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -1226,6 +1226,10 @@ async function fetchPlaylist() {
         const allTags = [...new Set(
           s.artist.split(',').flatMap(a => lfmCache[a.trim().toLowerCase()] || [])
         )];
+        // Debug apply step for DJ Khaled
+        if (s.artist.toLowerCase().includes('khaled')) {
+          log('DEBUG APPLY "' + s.artist + '" tags: [' + allTags.slice(0,5).join(', ') + '] → ' + categorizeByTags(allTags), 'current');
+        }
         if (allTags.length > 0) {
           const bucket = categorizeByTags(allTags);
           if (bucket !== 'misc') { s.bucket = bucket; lfmRescued++; }
